@@ -338,19 +338,6 @@ if (donationPopup) {
     });
 }
 
-// Ajouter le tracking aux fonctions existantes
-const originalAddIncome = confirmAddIncome;
-confirmAddIncome = function() {
-    originalAddIncome();
-    trackUserAction();
-};
-
-const originalAddExpense = confirmAddExpense;
-confirmAddExpense = function() {
-    originalAddExpense();
-    trackUserAction();
-};
-
 const originalExportData = exportData;
 exportData = function() {
     originalExportData();
@@ -645,20 +632,21 @@ exportData = function() {
         }
 
         function confirmAddIncome() {
-            const name = document.getElementById('incomeName').value.trim();
-            const amount = parseFloat(document.getElementById('incomeAmount').value);
-            
-            if (name && amount > 0) {
-                appData.users[currentUser].incomes.push({
-                    name: name,
-                    amount: amount,
-                    date: new Date().toISOString()
-                });
-                saveData();
-                renderApp();
-                closeModal('addIncomeModal');
-            }
-        }
+    const name = document.getElementById('incomeName').value.trim();
+    const amount = parseFloat(document.getElementById('incomeAmount').value);
+    
+    if (name && amount > 0) {
+        appData.users[currentUser].incomes.push({
+            name: name,
+            amount: amount,
+            date: new Date().toISOString()
+        });
+        saveData();
+        renderApp();
+        closeModal('addIncomeModal');
+        trackUserAction(); // <--- AJOUTEZ L'APPEL ICI
+    }
+}
 
         // Gestion des dépenses
         function addExpense(userId) {
@@ -669,20 +657,21 @@ exportData = function() {
         }
 
         function confirmAddExpense() {
-            const name = document.getElementById('expenseName').value.trim();
-            const amount = parseFloat(document.getElementById('expenseAmount').value);
-            
-            if (name && amount > 0) {
-                appData.users[currentUser].expenses.push({
-                    name: name,
-                    amount: amount,
-                    date: new Date().toISOString()
-                });
-                saveData();
-                renderApp();
-                closeModal('addExpenseModal');
-            }
-        }
+    const name = document.getElementById('expenseName').value.trim();
+    const amount = parseFloat(document.getElementById('expenseAmount').value);
+    
+    if (name && amount > 0) {
+        appData.users[currentUser].expenses.push({
+            name: name,
+            amount: amount,
+            date: new Date().toISOString()
+        });
+        saveData();
+        renderApp();
+        closeModal('addExpenseModal');
+        trackUserAction(); // <--- AJOUTEZ L'APPEL ICI
+    }
+}
 
         // Gestion des dépenses communes
         function addCommonExpense() {
