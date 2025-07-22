@@ -358,6 +358,7 @@
             color: white;
             padding: 3rem 0;
             text-align: center;
+            margin-bottom: 0; /* Ensure no margin */
         }
 
         .footer-content {
@@ -369,6 +370,7 @@
             gap: 2rem;
             justify-content: center;
             margin-top: 1rem;
+            flex-wrap: wrap; /* Allow wrapping on mobile */
         }
 
         .footer-links a {
@@ -382,8 +384,39 @@
             opacity: 1;
         }
 
+        /* Fix for mobile footer */
+        @media (max-width: 768px) {
+            body {
+                padding-bottom: 0;
+                margin-bottom: 0;
+            }
+            
+            .footer {
+                padding: 2rem 1rem 3rem; /* Extra bottom padding */
+            }
+            
+            .footer-links {
+                gap: 1rem;
+                padding: 0 1rem;
+            }
+            
+            .footer-links a {
+                padding: 0.5rem;
+            }
+            
+            /* Ensure last section has proper spacing */
+            .section:last-of-type {
+                padding-bottom: 3rem;
+            }
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
+            html, body {
+                overflow-x: hidden;
+                position: relative;
+            }
+            
             .hero h1 {
                 font-size: 2rem;
             }
@@ -404,6 +437,18 @@
             .btn {
                 width: 100%;
                 max-width: 300px;
+            }
+            
+            /* Ensure content is not cut off */
+            .container {
+                padding: 0 1rem 2rem;
+            }
+            
+            /* Safe area for iOS devices */
+            @supports (padding-bottom: env(safe-area-inset-bottom)) {
+                .footer {
+                    padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+                }
             }
         }
 
