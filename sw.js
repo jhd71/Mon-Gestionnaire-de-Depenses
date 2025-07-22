@@ -7,6 +7,7 @@ const URLS_TO_CACHE = [
   './styles.css',
   './manifest.json',
   './favicon.ico',
+  './images/paypal-icon.png',
   './images/icon-192.png',
   './images/icon-512.png'
 ];
