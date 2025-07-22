@@ -15,7 +15,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>Gestionnaire <br>de Dépenses 💰</h1>
+        <h1>Gestionnaire de Dépenses 💰</h1>
         <div class="header-buttons">
             <button class="btn-icon" onclick="showStats()" title="Statistiques">
                 <span class="material-icons">insights</span>
@@ -270,14 +270,105 @@
         let calcExpression = '0';
         let confirmCallback = null;
 
+// Gestion des dons - Variables globales
+let actionCount = 0;
+let sessionStart = Date.now();
+
+// Initialisation du système de donation
+function initDonation() {
+    // Enregistrer la première utilisation
+    const firstUse = localStorage.getItem('firstUse');
+    if (!firstUse) {
+        localStorage.setItem('firstUse', Date.now());
+        return; // Pas de popup lors de la première utilisation
+    }
+    
+    // Calculer les jours depuis la première utilisation
+    const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
+    const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
+    const daysSinceLastPrompt = lastDonationPrompt ? 
+        (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
+    
+    // Afficher après 7 jours, puis tous les 30 jours
+    if (daysSinceFirstUse >= 7 && daysSinceLastPrompt >= 30) {
+        setTimeout(() => {
+            showDonationPopup();
+            localStorage.setItem('lastDonationPrompt', Date.now());
+        }, 60000); // Après 1 minute de session
+    }
+}
+
+// Tracker les actions pour la popup contextuelle
+function trackUserAction() {
+    actionCount++;
+    const sessionTime = Date.now() - sessionStart;
+    
+    // Après 10 actions ou 5 minutes d'utilisation dans la session
+    if ((actionCount >= 10 || sessionTime > 300000) && !sessionStorage.getItem('donationShownThisSession')) {
+        const lastPrompt = localStorage.getItem('lastDonationPrompt');
+        const hoursSinceLastPrompt = lastPrompt ? 
+            (Date.now() - parseInt(lastPrompt)) / (1000 * 60 * 60) : 999;
+        
+        // Ne pas montrer si déjà montré dans les dernières 24h
+        if (hoursSinceLastPrompt > 24) {
+            showDonationPopup();
+            sessionStorage.setItem('donationShownThisSession', 'true');
+            localStorage.setItem('lastDonationPrompt', Date.now());
+        }
+    }
+}
+
+// Afficher la popup de donation
+function showDonationPopup() {
+    document.getElementById('donationPopup').style.display = 'flex';
+}
+
+// Fermer la popup de donation
+function closeDonationPopup() {
+    document.getElementById('donationPopup').style.display = 'none';
+}
+
+// Fermer en cliquant en dehors
+document.getElementById('donationPopup').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('donationPopup')) {
+        closeDonationPopup();
+    }
+});
+
+// Ajouter le tracking aux fonctions existantes
+const originalAddIncome = confirmAddIncome;
+confirmAddIncome = function() {
+    originalAddIncome();
+    trackUserAction();
+};
+
+const originalAddExpense = confirmAddExpense;
+confirmAddExpense = function() {
+    originalAddExpense();
+    trackUserAction();
+};
+
+const originalExportData = exportData;
+exportData = function() {
+    originalExportData();
+    trackUserAction();
+    
+    // Message contextuel après export (seulement une fois)
+    if (!localStorage.getItem('exportDonationSuggested')) {
+        setTimeout(() => {
+            if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
+                showDonationPopup();
+            }
+            localStorage.setItem('exportDonationSuggested', 'true');
+        }, 500);
+    }
+};
         // Initialisation
         document.addEventListener('DOMContentLoaded', () => {
-    // Forcer le mode sombre au chargement
-    document.body.setAttribute('data-theme', 'dark');
-    loadData();
-    initPWA();
-    renderApp();
-    initDonation(); // Initialiser les donations ICI
+            loadData();
+            initPWA();
+            renderApp();
+			initDonation();
             // Masquer le FAB au démarrage si on est sur le tableau de bord
             if (appData.currentTab === 'dashboard') {
                 document.getElementById('fabButton').style.display = 'none';
@@ -287,12 +378,18 @@
 
         // Fonctions de gestion des données
         function loadData() {
-            const saved = localStorage.getItem('expenseTrackerData');
-            if (saved) {
-                appData = JSON.parse(saved);
-                document.body.setAttribute('data-theme', appData.theme || 'light');
-            }
-        }
+    const saved = localStorage.getItem('expenseTrackerData');
+    if (saved) {
+        appData = JSON.parse(saved);
+        // Forcer le mode sombre
+        appData.theme = 'dark';
+        document.body.setAttribute('data-theme', 'dark');
+    } else {
+        // Si pas de données sauvegardées, initialiser en mode sombre
+        appData.theme = 'dark';
+        document.body.setAttribute('data-theme', 'dark');
+    }
+}
 
         function saveData() {
             localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
@@ -1044,147 +1141,48 @@
             
             openModal('statsModal');
         }
+            // PWA et installation
+        function initPWA() {
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js').catch(console.error);
             }
             
-            // Détection Firefox
+            // Gestion de l'installation PWA
+            let deferredPrompt;
+            
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                
+                // Créer un bouton d'installation personnalisé
+                const installBtn = document.createElement('button');
+                installBtn.textContent = '📱 Installer l\'app';
+                installBtn.className = 'btn';
+                installBtn.style.position = 'fixed';
+                installBtn.style.bottom = '100px';
+                installBtn.style.right = '20px';
+                installBtn.style.zIndex = '100';
+                installBtn.onclick = async () => {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        installBtn.remove();
+                    }
+                    deferredPrompt = null;
+                };
+                document.body.appendChild(installBtn);
+            });
+			
+			// Détection Firefox
 	if (navigator.userAgent.includes('Firefox')) {
     setTimeout(() => {
         if (!localStorage.getItem('firefoxNoticeShown')) {
             alert('📱 Pour installer cette app sur Firefox :\n\n1. Ajoutez la page aux favoris\n2. Épinglez-la à votre écran d\'accueil\n\nVos données sont sauvegardées localement.');
             localStorage.setItem('firefoxNoticeShown', 'true');
         }
-		}, 3000);
+    }, 3000);
 	}
-
-		// PWA et installation
-function initPWA() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(console.error);
-    }
-    
-    // Gestion de l'installation PWA
-    let deferredPrompt;
-    
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        
-        // Créer un bouton d'installation personnalisé
-        const installBtn = document.createElement('button');
-        installBtn.textContent = '📱 Installer l\'app';
-        installBtn.className = 'btn';
-        installBtn.style.position = 'fixed';
-        installBtn.style.bottom = '100px';
-        installBtn.style.right = '20px';
-        installBtn.style.zIndex = '100';
-        installBtn.onclick = async () => {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') {
-                installBtn.remove();
-            }
-            deferredPrompt = null;
-        };
-        document.body.appendChild(installBtn);
-    });
-}
-
-// Gestion des dons - Variables globales
-let actionCount = 0;
-let sessionStart = Date.now();
-
-// Initialisation du système de donation
-function initDonation() {
-    // Enregistrer la première utilisation
-    const firstUse = localStorage.getItem('firstUse');
-    if (!firstUse) {
-        localStorage.setItem('firstUse', Date.now());
-        return; // Pas de popup lors de la première utilisation
-    }
-    
-    // Calculer les jours depuis la première utilisation
-    const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
-    const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
-    const daysSinceLastPrompt = lastDonationPrompt ? 
-        (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
-    
-    // Afficher après 7 jours, puis tous les 30 jours
-    if (daysSinceFirstUse >= 7 && daysSinceLastPrompt >= 30) {
-        setTimeout(() => {
-            showDonationPopup();
-            localStorage.setItem('lastDonationPrompt', Date.now());
-        }, 60000); // Après 1 minute de session
-    }
-}
-
-// Tracker les actions pour la popup contextuelle
-function trackUserAction() {
-    actionCount++;
-    const sessionTime = Date.now() - sessionStart;
-    
-    // Après 10 actions ou 5 minutes d'utilisation dans la session
-    if ((actionCount >= 10 || sessionTime > 300000) && !sessionStorage.getItem('donationShownThisSession')) {
-        const lastPrompt = localStorage.getItem('lastDonationPrompt');
-        const hoursSinceLastPrompt = lastPrompt ? 
-            (Date.now() - parseInt(lastPrompt)) / (1000 * 60 * 60) : 999;
-        
-        // Ne pas montrer si déjà montré dans les dernières 24h
-        if (hoursSinceLastPrompt > 24) {
-            showDonationPopup();
-            sessionStorage.setItem('donationShownThisSession', 'true');
-            localStorage.setItem('lastDonationPrompt', Date.now());
         }
-    }
-}
-
-// Afficher la popup de donation
-function showDonationPopup() {
-    document.getElementById('donationPopup').style.display = 'flex';
-}
-
-// Fermer la popup de donation
-function closeDonationPopup() {
-    document.getElementById('donationPopup').style.display = 'none';
-}
-
-// Fermer en cliquant en dehors
-document.getElementById('donationPopup').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('donationPopup')) {
-        closeDonationPopup();
-    }
-});
-
-// Ajouter le tracking aux fonctions existantes
-const originalAddIncome = confirmAddIncome;
-confirmAddIncome = function() {
-    originalAddIncome();
-    trackUserAction();
-};
-
-const originalAddExpense = confirmAddExpense;
-confirmAddExpense = function() {
-    originalAddExpense();
-    trackUserAction();
-};
-
-const originalExportData = exportData;
-exportData = function() {
-    originalExportData();
-    trackUserAction();
-    
-    // Message contextuel après export (seulement une fois)
-    if (!localStorage.getItem('exportDonationSuggested')) {
-        setTimeout(() => {
-            if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
-                showDonationPopup();
-            }
-            localStorage.setItem('exportDonationSuggested', 'true');
-        }, 500);
-    }
-};
-
     </script>
 	<!-- Popup de donation -->
 <div id="donationPopup" class="donation-overlay" style="display: none;">
