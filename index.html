@@ -277,6 +277,7 @@
     loadData();
     initPWA();
     renderApp();
+    initDonation(); // Initialiser les donations ICI
             // Masquer le FAB au démarrage si on est sur le tableau de bord
             if (appData.currentTab === 'dashboard') {
                 document.getElementById('fabButton').style.display = 'none';
@@ -1094,6 +1095,30 @@ function initPWA() {
 let actionCount = 0;
 let sessionStart = Date.now();
 
+// Initialisation du système de donation
+function initDonation() {
+    // Enregistrer la première utilisation
+    const firstUse = localStorage.getItem('firstUse');
+    if (!firstUse) {
+        localStorage.setItem('firstUse', Date.now());
+        return; // Pas de popup lors de la première utilisation
+    }
+    
+    // Calculer les jours depuis la première utilisation
+    const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
+    const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
+    const daysSinceLastPrompt = lastDonationPrompt ? 
+        (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
+    
+    // Afficher après 7 jours, puis tous les 30 jours
+    if (daysSinceFirstUse >= 7 && daysSinceLastPrompt >= 30) {
+        setTimeout(() => {
+            showDonationPopup();
+            localStorage.setItem('lastDonationPrompt', Date.now());
+        }, 60000); // Après 1 minute de session
+    }
+}
+
 // Tracker les actions pour la popup contextuelle
 function trackUserAction() {
     actionCount++;
@@ -1122,30 +1147,6 @@ function showDonationPopup() {
 // Fermer la popup de donation
 function closeDonationPopup() {
     document.getElementById('donationPopup').style.display = 'none';
-}
-
-// Initialisation du système de donation
-function initDonation() {
-    // Enregistrer la première utilisation
-    const firstUse = localStorage.getItem('firstUse');
-    if (!firstUse) {
-        localStorage.setItem('firstUse', Date.now());
-        return; // Pas de popup lors de la première utilisation
-    }
-    
-    // Calculer les jours depuis la première utilisation
-    const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
-    const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
-    const daysSinceLastPrompt = lastDonationPrompt ? 
-        (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
-    
-    // Afficher après 7 jours, puis tous les 30 jours
-    if (daysSinceFirstUse >= 7 && daysSinceLastPrompt >= 30) {
-        setTimeout(() => {
-            showDonationPopup();
-            localStorage.setItem('lastDonationPrompt', Date.now());
-        }, 60000); // Après 1 minute de session
-    }
 }
 
 // Fermer en cliquant en dehors
@@ -1183,13 +1184,6 @@ exportData = function() {
         }, 500);
     }
 };
-
-document.addEventListener('DOMContentLoaded', () => {
-    loadData();
-    initPWA();
-    renderApp();
-    initDonation(); // Initialiser les donations ICI
-});
 
     </script>
 	<!-- Popup de donation -->
