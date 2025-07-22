@@ -859,3 +859,10 @@ h1 span {
         opacity: 1;
     }
 }
+
+@media (max-width: 600px) {
+  .line-break::after {
+    content: '\A';
+    white-space: pre;
+  }
+}
