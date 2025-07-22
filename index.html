@@ -1161,50 +1161,108 @@
     }
 
     // PWA et installation
-    function initPWA() {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(console.error);
+    // Variable globale pour stocker l'événement d'installation
+let deferredPrompt = null;
+
+function initPWA() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
+    }
+    
+    // Gestion de l'installation PWA
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Montrer le bouton dans les paramètres
+        const installBtn = document.getElementById('installAppBtn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
         }
         
-        // Gestion de l'installation PWA
-        let deferredPrompt;
-        
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            
-            // Créer un bouton d'installation personnalisé
-            const existingBtn = document.querySelector('.install-btn-pwa');
-            if (!existingBtn) {
-                const installBtn = document.createElement('button');
-                installBtn.textContent = '📱 Installer l\'app';
-                installBtn.className = 'btn install-btn-pwa';
-                installBtn.style.position = 'fixed';
-                installBtn.style.bottom = '100px';
-                installBtn.style.right = '20px';
-                installBtn.style.zIndex = '100';
-                installBtn.onclick = async () => {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                        installBtn.remove();
-                    }
-                    deferredPrompt = null;
-                };
-                document.body.appendChild(installBtn);
+        // Créer aussi le bouton flottant (optionnel)
+        const existingBtn = document.querySelector('.install-btn-pwa');
+        if (!existingBtn && !isStandalone()) {
+            const floatingBtn = document.createElement('button');
+            floatingBtn.textContent = '📱 Installer';
+            floatingBtn.className = 'btn install-btn-pwa';
+            floatingBtn.style.position = 'fixed';
+            floatingBtn.style.bottom = '100px';
+            floatingBtn.style.right = '20px';
+            floatingBtn.style.zIndex = '100';
+            floatingBtn.onclick = installApp;
+            document.body.appendChild(floatingBtn);
+        }
+    });
+    
+    // Vérifier si déjà installé
+    window.addEventListener('appinstalled', () => {
+        // Masquer les boutons d'installation
+        const installBtn = document.getElementById('installAppBtn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+        const floatingBtn = document.querySelector('.install-btn-pwa');
+        if (floatingBtn) {
+            floatingBtn.remove();
+        }
+    });
+    
+    // Détection Firefox
+    if (navigator.userAgent.includes('Firefox')) {
+        setTimeout(() => {
+            if (!localStorage.getItem('firefoxNoticeShown')) {
+                alert('📱 Pour installer cette app sur Firefox :\n\n1. Ajoutez la page aux favoris\n2. Épinglez-la à votre écran d\'accueil\n\nVos données sont sauvegardées localement.');
+                localStorage.setItem('firefoxNoticeShown', 'true');
             }
-        });
-        
-        // Détection Firefox
-        if (navigator.userAgent.includes('Firefox')) {
-            setTimeout(() => {
-                if (!localStorage.getItem('firefoxNoticeShown')) {
-                    alert('📱 Pour installer cette app sur Firefox :\n\n1. Ajoutez la page aux favoris\n2. Épinglez-la à votre écran d\'accueil\n\nVos données sont sauvegardées localement.');
-                    localStorage.setItem('firefoxNoticeShown', 'true');
-                }
-            }, 3000);
+        }, 3000);
+    }
+}
+
+// Fonction pour installer l'app
+async function installApp() {
+    if (!deferredPrompt) {
+        // Si pas d'invite disponible, ouvrir dans le navigateur
+        if (isInPWA()) {
+            // Si on est dans une PWA, ouvrir dans le navigateur
+            window.open('https://depenses.actuetmedia.fr/', '_blank');
+            alert('L\'application s\'est ouverte dans votre navigateur.\nVous pouvez maintenant l\'installer depuis là.');
+        } else {
+            alert('L\'installation n\'est pas disponible.\nAssurez-vous d\'utiliser Chrome, Edge ou un navigateur compatible.');
+        }
+        return;
+    }
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+        console.log('Installation acceptée');
+        // Masquer les boutons
+        const installBtn = document.getElementById('installAppBtn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+        const floatingBtn = document.querySelector('.install-btn-pwa');
+        if (floatingBtn) {
+            floatingBtn.remove();
         }
     }
+    
+    deferredPrompt = null;
+}
+
+// Détecter si on est en mode standalone (PWA)
+function isStandalone() {
+    return (window.matchMedia('(display-mode: standalone)').matches) ||
+           (window.navigator.standalone) ||
+           document.referrer.includes('android-app://');
+}
+
+// Détecter si on est dans une PWA
+function isInPWA() {
+    return window.opener === null && isStandalone();
+}
 </script>
 	<!-- Popup de donation -->
 <div id="donationPopup" class="donation-overlay" style="display: none;">
