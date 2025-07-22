@@ -1039,36 +1039,53 @@
         }
             // PWA et installation
         function initPWA() {
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('./sw.js').catch(console.error);
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
+    }
+
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        // Bouton pour Chrome
+        const installBtn = document.createElement('button');
+        installBtn.textContent = '📱 Installer l\'app';
+        installBtn.className = 'btn';
+        installBtn.style.position = 'fixed';
+        installBtn.style.bottom = '100px';
+        installBtn.style.right = '20px';
+        installBtn.style.zIndex = '100';
+        installBtn.onclick = async () => {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                installBtn.remove();
             }
-            
-            // Gestion de l'installation PWA
-            let deferredPrompt;
-            
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                
-                // Créer un bouton d'installation personnalisé
-                const installBtn = document.createElement('button');
-                installBtn.textContent = '📱 Installer l\'app';
-                installBtn.className = 'btn';
-                installBtn.style.position = 'fixed';
-                installBtn.style.bottom = '100px';
-                installBtn.style.right = '20px';
-                installBtn.style.zIndex = '100';
-                installBtn.onclick = async () => {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                        installBtn.remove();
-                    }
-                    deferredPrompt = null;
-                };
-                document.body.appendChild(installBtn);
-            });
-        }
-    </script>
+            deferredPrompt = null;
+        };
+        document.body.appendChild(installBtn);
+    });
+
+    // ➕ Message manuel pour Firefox
+    const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+    if (isFirefox) {
+        const helpBtn = document.createElement('div');
+        helpBtn.textContent = 'ℹ️ Installer l\'app via le menu de Firefox (≡ > Installer)';
+        helpBtn.style.position = 'fixed';
+        helpBtn.style.bottom = '100px';
+        helpBtn.style.right = '20px';
+        helpBtn.style.background = '#222';
+        helpBtn.style.color = 'white';
+        helpBtn.style.padding = '10px';
+        helpBtn.style.borderRadius = '8px';
+        helpBtn.style.zIndex = '100';
+        helpBtn.style.fontSize = '14px';
+        helpBtn.style.maxWidth = '200px';
+        document.body.appendChild(helpBtn);
+    }
+}
+</script>
 </body>
 </html>
