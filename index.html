@@ -329,11 +329,14 @@ function closeDonationPopup() {
 }
 
 // Fermer en cliquant en dehors
-document.getElementById('donationPopup').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('donationPopup')) {
-        closeDonationPopup();
-    }
-});
+const donationPopup = document.getElementById('donationPopup');
+if (donationPopup) {
+    donationPopup.addEventListener('click', (e) => {
+        if (e.target === donationPopup) {
+            closeDonationPopup();
+        }
+    });
+}
 
 // Ajouter le tracking aux fonctions existantes
 const originalAddIncome = confirmAddIncome;
