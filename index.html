@@ -268,9 +268,11 @@
 
         // Initialisation
         document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-            initPWA();
-            renderApp();
+    // Forcer le mode sombre au chargement
+    document.body.setAttribute('data-theme', 'dark');
+    loadData();
+    initPWA();
+    renderApp();
             // Masquer le FAB au démarrage si on est sur le tableau de bord
             if (appData.currentTab === 'dashboard') {
                 document.getElementById('fabButton').style.display = 'none';
