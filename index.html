@@ -210,21 +210,25 @@
         <div class="modal-content">
             <div class="modal-header">Paramètres</div>
             <div class="modal-body">
-                <div style="display: grid; gap: 1rem;">
-                    <button class="btn" onclick="exportData()">
-                        <span class="material-icons" style="vertical-align: middle; margin-right: 0.5rem;">download</span>
-                        Exporter les données
-                    </button>
-                    <button class="btn" onclick="importData()">
-                        <span class="material-icons" style="vertical-align: middle; margin-right: 0.5rem;">upload</span>
-                        Importer des données
-                    </button>
-                    <button class="btn btn-danger" onclick="confirmReset()">
-                        <span class="material-icons" style="vertical-align: middle; margin-right: 0.5rem;">delete_forever</span>
-                        Réinitialiser tout
-                    </button>
-                </div>
-            </div>
+    <div style="display: grid; gap: 1rem;">
+        <button class="btn" onclick="exportData()">
+            <span class="material-icons">download</span>
+            Exporter les données
+        </button>
+        <button class="btn" onclick="importData()">
+            <span class="material-icons">upload</span>
+            Importer des données
+        </button>
+        <button class="btn" style="background-color: #e11d48;" onclick="showDonationPopup()">
+            <span class="material-icons">favorite</span>
+            Soutenir ce projet gratuit
+        </button>
+        <button class="btn btn-danger" onclick="confirmReset()">
+            <span class="material-icons">delete_forever</span>
+            Réinitialiser tout
+        </button>
+    </div>
+</div>
             <div class="modal-footer">
                 <button class="btn" onclick="closeModal('settingsModal')">Fermer</button>
             </div>
@@ -1085,6 +1089,123 @@ function initPWA() {
         document.body.appendChild(installBtn);
     });
 }
+
+// Gestion des dons - Variables globales
+let actionCount = 0;
+let sessionStart = Date.now();
+
+// Initialisation du système de donation
+function initDonation() {
+    // Enregistrer la première utilisation
+    const firstUse = localStorage.getItem('firstUse');
+    if (!firstUse) {
+        localStorage.setItem('firstUse', Date.now());
+        return; // Pas de popup lors de la première utilisation
+    }
+    
+    // Calculer les jours depuis la première utilisation
+    const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
+    const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
+    const daysSinceLastPrompt = lastDonationPrompt ? 
+        (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
+    
+    // Afficher après 7 jours, puis tous les 30 jours
+    if (daysSinceFirstUse >= 7 && daysSinceLastPrompt >= 30) {
+        setTimeout(() => {
+            showDonationPopup();
+            localStorage.setItem('lastDonationPrompt', Date.now());
+        }, 60000); // Après 1 minute de session
+    }
+}
+
+// Tracker les actions pour la popup contextuelle
+function trackUserAction() {
+    actionCount++;
+    const sessionTime = Date.now() - sessionStart;
+    
+    // Après 10 actions ou 5 minutes d'utilisation dans la session
+    if ((actionCount >= 10 || sessionTime > 300000) && !sessionStorage.getItem('donationShownThisSession')) {
+        const lastPrompt = localStorage.getItem('lastDonationPrompt');
+        const hoursSinceLastPrompt = lastPrompt ? 
+            (Date.now() - parseInt(lastPrompt)) / (1000 * 60 * 60) : 999;
+        
+        // Ne pas montrer si déjà montré dans les dernières 24h
+        if (hoursSinceLastPrompt > 24) {
+            showDonationPopup();
+            sessionStorage.setItem('donationShownThisSession', 'true');
+            localStorage.setItem('lastDonationPrompt', Date.now());
+        }
+    }
+}
+
+// Afficher la popup de donation
+function showDonationPopup() {
+    document.getElementById('donationPopup').style.display = 'flex';
+}
+
+// Fermer la popup de donation
+function closeDonationPopup() {
+    document.getElementById('donationPopup').style.display = 'none';
+}
+
+// Fermer en cliquant en dehors
+document.getElementById('donationPopup').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('donationPopup')) {
+        closeDonationPopup();
+    }
+});
+
+// Ajouter le tracking aux fonctions existantes
+const originalAddIncome = confirmAddIncome;
+confirmAddIncome = function() {
+    originalAddIncome();
+    trackUserAction();
+};
+
+const originalAddExpense = confirmAddExpense;
+confirmAddExpense = function() {
+    originalAddExpense();
+    trackUserAction();
+};
+
+const originalExportData = exportData;
+exportData = function() {
+    originalExportData();
+    trackUserAction();
+    
+    // Message contextuel après export (seulement une fois)
+    if (!localStorage.getItem('exportDonationSuggested')) {
+        setTimeout(() => {
+            if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
+                showDonationPopup();
+            }
+            localStorage.setItem('exportDonationSuggested', 'true');
+        }, 500);
+    }
+};
+
+// Ajouter l'init au DOMContentLoaded existant
+document.addEventListener('DOMContentLoaded', () => {
+    // ... votre code existant ...
+    initDonation(); // Ajouter cette ligne
+});
+
     </script>
+	<!-- Popup de donation -->
+<div id="donationPopup" class="donation-overlay" style="display: none;">
+    <div class="donation-popup">
+        <span class="donation-close" onclick="closeDonationPopup()">×</span>
+        <h3>💖 Soutenez ce projet</h3>
+        <p>Cette application est 100% gratuite et sans publicité.<br>
+        Si elle vous est utile, un petit don nous aide à continuer ! 🙏</p>
+        <a href="https://www.paypal.com/donate/?hosted_button_id=FKJPST5LWBUGG" target="_blank" class="donation-link">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px;">volunteer_activism</span>
+            Faire un don via PayPal
+        </a>
+        <p style="margin-top: 1rem; font-size: 0.875rem; opacity: 0.7;">
+            Merci de votre soutien ! ❤️
+        </p>
+    </div>
+</div>
 </body>
 </html>
