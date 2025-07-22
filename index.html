@@ -1039,36 +1039,51 @@
         }
             // PWA et installation
         function initPWA() {
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('./sw.js').catch(console.error);
-            }
-            
-            // Gestion de l'installation PWA
-            let deferredPrompt;
-            
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                
-                // Créer un bouton d'installation personnalisé
-                const installBtn = document.createElement('button');
-                installBtn.textContent = '📱 Installer l\'app';
-                installBtn.className = 'btn';
-                installBtn.style.position = 'fixed';
-                installBtn.style.bottom = '100px';
-                installBtn.style.right = '20px';
-                installBtn.style.zIndex = '100';
-                installBtn.onclick = async () => {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                        installBtn.remove();
-                    }
-                    deferredPrompt = null;
-                };
-                document.body.appendChild(installBtn);
-            });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(console.error);
+  }
+
+  let deferredPrompt;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    showInstallButton(() => {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(({ outcome }) => {
+        if (outcome === 'accepted') {
+          installBtn.remove();
         }
+        deferredPrompt = null;
+      });
+    });
+  });
+
+  // ➕ BONUS pour Firefox : forcer le bouton si l'app n’est pas installée
+  const isInStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+
+  if (!isInStandalone && isFirefox) {
+    showInstallButton(() => {
+      alert("Sur Firefox, ajoute l'application via le menu du navigateur.");
+    });
+  }
+
+  // Fonction générique pour afficher le bouton
+  function showInstallButton(onClickAction) {
+    const installBtn = document.createElement('button');
+    installBtn.textContent = '📱 Installer l\'app';
+    installBtn.className = 'btn';
+    installBtn.style.position = 'fixed';
+    installBtn.style.bottom = '100px';
+    installBtn.style.right = '20px';
+    installBtn.style.zIndex = '100';
+    installBtn.onclick = onClickAction;
+    document.body.appendChild(installBtn);
+  }
+}
+
     </script>
 </body>
 </html>
