@@ -17,6 +17,14 @@
     <div class="header">
         <h1>Gestionnaire de Dépenses 💰</h1>
         <div class="header-buttons">
+    <!-- Bouton d'installation (masqué si déjà installé) -->
+    <button class="btn-icon" id="headerInstallBtn" onclick="installApp()" title="Installer l'application" style="display: none;">
+        <span class="material-icons">install_mobile</span>
+    </button>
+    
+    <button class="btn-icon" onclick="showStats()" title="Statistiques">
+        <span class="material-icons">insights</span>
+    </button>
             <button class="btn-icon" onclick="showStats()" title="Statistiques">
                 <span class="material-icons">insights</span>
             </button>
@@ -360,37 +368,44 @@
     }
 
     function initDonation() {
-        // Ajouter l'event listener pour fermer en cliquant en dehors
-        const donationPopup = document.getElementById('donationPopup');
-        if (donationPopup) {
-            donationPopup.addEventListener('click', (e) => {
-                if (e.target === donationPopup) {
-                    closeDonationPopup();
-                }
-            });
-        }
-        
-        // Enregistrer la première utilisation
-        const firstUse = localStorage.getItem('firstUse');
-        if (!firstUse) {
-            localStorage.setItem('firstUse', Date.now());
-            return; // Pas de popup lors de la première utilisation
-        }
-        
-        // Calculer les jours depuis la première utilisation
-        const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
-        const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
-        const daysSinceLastPrompt = lastDonationPrompt ? 
-            (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
-        
-        // Afficher après 7 jours, puis tous les 30 jours
-        if (daysSinceFirstUse >= 7 && daysSinceLastPrompt >= 30) {
-            setTimeout(() => {
-                showDonationPopup();
-                localStorage.setItem('lastDonationPrompt', Date.now());
-            }, 60000); // Après 1 minute de session
-        }
+    const donationPopup = document.getElementById('donationPopup');
+    if (donationPopup) {
+        donationPopup.addEventListener('click', (e) => {
+            if (e.target === donationPopup) {
+                closeDonationPopup();
+            }
+        });
     }
+    
+    const firstUse = localStorage.getItem('firstUse');
+    if (!firstUse) {
+        localStorage.setItem('firstUse', Date.now());
+        
+        // Pour les nouveaux utilisateurs : popup après 10 minutes d'utilisation
+        setTimeout(() => {
+            if (!sessionStorage.getItem('donationShownThisSession')) {
+                showDonationPopup();
+                sessionStorage.setItem('donationShownThisSession', 'true');
+                localStorage.setItem('lastDonationPrompt', Date.now());
+            }
+        }, 600000); // 10 minutes
+        return;
+    }
+    
+    // Pour les utilisateurs réguliers : système existant
+    const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
+    const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
+    const daysSinceLastPrompt = lastDonationPrompt ? 
+        (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
+    
+    // Après 3 jours puis tous les 30 jours
+    if (daysSinceFirstUse >= 3 && daysSinceLastPrompt >= 30) {
+        setTimeout(() => {
+            showDonationPopup();
+            localStorage.setItem('lastDonationPrompt', Date.now());
+        }, 60000); // 1 minute après ouverture
+    }
+}
 
     // Fonctions de rendu
     function renderApp() {
