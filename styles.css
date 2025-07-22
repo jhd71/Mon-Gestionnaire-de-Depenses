@@ -860,21 +860,3 @@ h1 span {
     }
 }
 
-/* Par défaut : tout sur une ligne */
-.title {
-  white-space: nowrap;
-}
-
-/* Mobile : forcer un retour à la ligne après "Gestionnaire" */
-@media (max-width: 600px) {
-  .title {
-    white-space: normal;
-    text-align: center;
-  }
-
-  .mobile-break::after {
-    content: "\A";
-    white-space: pre;
-  }
-}
-
