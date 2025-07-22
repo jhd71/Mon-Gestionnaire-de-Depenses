@@ -1,6 +1,7 @@
 {
   "name": "Gestionnaire de Dépenses",
   "short_name": "Dépenses",
+  "id": "/index.html",
   "description": "Application de gestion des dépenses personnelles",
   "start_url": "./index.html",
   "scope": "./",
@@ -37,6 +38,16 @@
   }
 ],
   "screenshots": [
+  {
+    "src": "images/screen2.png",
+    "type": "image/png",
+    "sizes": "1280x720"
+  },
+  {
+    "src": "images/screen3.png",
+    "type": "image/png",
+    "sizes": "720x1280"
+  },
     {
       "src": "images/screen1.png",
       "type": "image/png",
