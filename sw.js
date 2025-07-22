@@ -1,6 +1,6 @@
 // sw.js - Version améliorée pour Firefox/Opera
 
-const CACHE_NAME = 'gestionnaire-depenses-cache-v1.3';
+const CACHE_NAME = 'gestionnaire-depenses-cache-v1.4';
 const URLS_TO_CACHE = [
   './',
   './index.html',
@@ -9,6 +9,11 @@ const URLS_TO_CACHE = [
   './favicon.ico',
   './images/paypal-icon.png',
   './images/icon-192.png',
+  './images/icon-192-maskable.png',
+  './images/icon-512-maskable.png',
+  './images/screen1.png',
+  './images/screen2.png',
+  './images/screen3.png',
   './images/icon-512.png'
 ];
 
