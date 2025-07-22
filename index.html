@@ -1038,71 +1038,37 @@
             openModal('statsModal');
         }
             // PWA et installation
-        // PWA Installation
-class PWAInstaller {
-    constructor() {
-        this.deferredPrompt = null;
-        this.installButton = document.getElementById('menuInstall');
-        this.setupEventListeners();
-    }
-
-    setupEventListeners() {
-        // Masquer le bouton par défaut
-        if (this.installButton) {
-            this.installButton.style.display = 'none';
-        }
-
-        window.addEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt.bind(this));
-        window.addEventListener('appinstalled', this.handleAppInstalled.bind(this));
-    }
-
-    // Dans votre classe PWAInstaller
-async handleBeforeInstallPrompt(event) {
-    // Garder event.preventDefault() - c'est nécessaire pour votre bannière personnalisée
-    event.preventDefault();
-    this.deferredPrompt = event;
-
-    if (this.installButton) {
-        this.installButton.style.display = 'block';
-        this.installButton.addEventListener('click', this.handleInstallClick.bind(this), { once: true });
-    }
-    
-    // Appeler la bannière personnalisée existante dans contentManager
-    if (window.contentManager && typeof window.contentManager.showInstallBanner === 'function') {
-        window.contentManager.showInstallBanner();
-    }
-    
-    // Si vous voyez toujours l'erreur, ajoutez ce commentaire pour ignorer l'avertissement
-    console.log('Installation PWA disponible - bannière personnalisée utilisée');
-}
-
-    async handleInstallClick(event) {
-        event.preventDefault();
-        if (!this.deferredPrompt) return;
-
-        try {
-            const result = await this.deferredPrompt.prompt();
-            console.log('Résultat de l\'installation:', result);
-            
-            if (result.outcome === 'accepted') {
-                console.log('PWA installée avec succès');
-                this.installButton.style.display = 'none';
+        function initPWA() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch(console.error);
             }
-        } catch (error) {
-            console.error('Erreur lors de l\'installation:', error);
-        } finally {
-            this.deferredPrompt = null;
+            
+            // Gestion de l'installation PWA
+            let deferredPrompt;
+            
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                
+                // Créer un bouton d'installation personnalisé
+                const installBtn = document.createElement('button');
+                installBtn.textContent = '📱 Installer l\'app';
+                installBtn.className = 'btn';
+                installBtn.style.position = 'fixed';
+                installBtn.style.bottom = '100px';
+                installBtn.style.right = '20px';
+                installBtn.style.zIndex = '100';
+                installBtn.onclick = async () => {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        installBtn.remove();
+                    }
+                    deferredPrompt = null;
+                };
+                document.body.appendChild(installBtn);
+            });
         }
-    }
-
-    handleAppInstalled() {
-        console.log('PWA installée avec succès');
-        if (this.installButton) {
-            this.installButton.style.display = 'none';
-        }
-        this.deferredPrompt = null;
-    }
-}
     </script>
 </body>
 </html>
