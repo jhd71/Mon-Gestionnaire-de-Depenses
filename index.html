@@ -251,203 +251,821 @@
     </div>
 
     <script>
-        // État global de l'application
-        let appData = {
-            users: {
-                'commun': {
-                    name: 'Commun',
-                    incomes: [],
-                    expenses: []
-                }
-            },
-            commonExpenses: [],
-            currentTab: 'dashboard',
-            theme: 'light'
-        };
+    // État global de l'application
+    let appData = {
+        users: {
+            'commun': {
+                name: 'Commun',
+                incomes: [],
+                expenses: []
+            }
+        },
+        commonExpenses: [],
+        currentTab: 'dashboard',
+        theme: 'dark'
+    };
 
-        // Variables globales
-        let currentUser = '';
-        let calcExpression = '0';
-        let confirmCallback = null;
+    // Variables globales
+    let currentUser = '';
+    let calcExpression = '0';
+    let confirmCallback = null;
+    let actionCount = 0;
+    let sessionStart = Date.now();
 
-// Gestion des dons - Variables globales
-let actionCount = 0;
-let sessionStart = Date.now();
-
-// Tracker les actions pour la popup contextuelle
-function trackUserAction() {
-    actionCount++;
-    const sessionTime = Date.now() - sessionStart;
-    
-    // Après 10 actions ou 5 minutes d'utilisation dans la session
-    if ((actionCount >= 10 || sessionTime > 300000) && !sessionStorage.getItem('donationShownThisSession')) {
-        const lastPrompt = localStorage.getItem('lastDonationPrompt');
-        const hoursSinceLastPrompt = lastPrompt ? 
-            (Date.now() - parseInt(lastPrompt)) / (1000 * 60 * 60) : 999;
+    // Initialisation
+    document.addEventListener('DOMContentLoaded', () => {
+        // Forcer le mode sombre au démarrage
+        document.body.setAttribute('data-theme', 'dark');
+        loadData();
+        initPWA();
+        renderApp();
+        initDonation();
         
-        // Ne pas montrer si déjà montré dans les dernières 24h
-        if (hoursSinceLastPrompt > 24) {
-            showDonationPopup();
-            sessionStorage.setItem('donationShownThisSession', 'true');
-            localStorage.setItem('lastDonationPrompt', Date.now());
+        // Masquer le FAB au démarrage si on est sur le tableau de bord
+        if (appData.currentTab === 'dashboard') {
+            document.getElementById('fabButton').style.display = 'none';
+        }
+        
+        // Surcharge de exportData pour le tracking
+        const originalExportData = exportData;
+        window.exportData = function() {
+            originalExportData();
+            trackUserAction();
+            
+            // Message contextuel après export (seulement une fois)
+            if (!localStorage.getItem('exportDonationSuggested')) {
+                setTimeout(() => {
+                    if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
+                        showDonationPopup();
+                    }
+                    localStorage.setItem('exportDonationSuggested', 'true');
+                }, 500);
+            }
+        };
+        
+        setInterval(saveData, 5000); // Sauvegarde automatique toutes les 5 secondes
+    });
+
+    // Fonctions de gestion des données
+    function loadData() {
+        const saved = localStorage.getItem('expenseTrackerData');
+        if (saved) {
+            appData = JSON.parse(saved);
+            // Forcer le mode sombre
+            appData.theme = 'dark';
+            document.body.setAttribute('data-theme', 'dark');
+        } else {
+            // Si pas de données sauvegardées, initialiser en mode sombre
+            appData.theme = 'dark';
+            document.body.setAttribute('data-theme', 'dark');
         }
     }
-}
 
-// Afficher la popup de donation
-function showDonationPopup() {
-    document.getElementById('donationPopup').style.display = 'flex';
-}
+    function saveData() {
+        localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
+    }
 
-// Fermer la popup de donation
-function closeDonationPopup() {
-    document.getElementById('donationPopup').style.display = 'none';
-}
+    // Fonctions de donation
+    function trackUserAction() {
+        actionCount++;
+        const sessionTime = Date.now() - sessionStart;
+        
+        // Après 10 actions ou 5 minutes d'utilisation dans la session
+        if ((actionCount >= 10 || sessionTime > 300000) && !sessionStorage.getItem('donationShownThisSession')) {
+            const lastPrompt = localStorage.getItem('lastDonationPrompt');
+            const hoursSinceLastPrompt = lastPrompt ? 
+                (Date.now() - parseInt(lastPrompt)) / (1000 * 60 * 60) : 999;
+            
+            // Ne pas montrer si déjà montré dans les dernières 24h
+            if (hoursSinceLastPrompt > 24) {
+                showDonationPopup();
+                sessionStorage.setItem('donationShownThisSession', 'true');
+                localStorage.setItem('lastDonationPrompt', Date.now());
+            }
+        }
+    }
 
-// Initialisation du système de donation
-function initDonation() {
-    // Enregistrer la première utilisation
-    const firstUse = localStorage.getItem('firstUse');
-    if (!firstUse) {
-        localStorage.setItem('firstUse', Date.now());
-        return; // Pas de popup lors de la première utilisation
+    function showDonationPopup() {
+        const popup = document.getElementById('donationPopup');
+        if (popup) {
+            popup.style.display = 'flex';
+        }
+    }
+
+    function closeDonationPopup() {
+        const popup = document.getElementById('donationPopup');
+        if (popup) {
+            popup.style.display = 'none';
+        }
+    }
+
+    function initDonation() {
+        // Ajouter l'event listener pour fermer en cliquant en dehors
+        const donationPopup = document.getElementById('donationPopup');
+        if (donationPopup) {
+            donationPopup.addEventListener('click', (e) => {
+                if (e.target === donationPopup) {
+                    closeDonationPopup();
+                }
+            });
+        }
+        
+        // Enregistrer la première utilisation
+        const firstUse = localStorage.getItem('firstUse');
+        if (!firstUse) {
+            localStorage.setItem('firstUse', Date.now());
+            return; // Pas de popup lors de la première utilisation
+        }
+        
+        // Calculer les jours depuis la première utilisation
+        const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
+        const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
+        const daysSinceLastPrompt = lastDonationPrompt ? 
+            (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
+        
+        // Afficher après 7 jours, puis tous les 30 jours
+        if (daysSinceFirstUse >= 7 && daysSinceLastPrompt >= 30) {
+            setTimeout(() => {
+                showDonationPopup();
+                localStorage.setItem('lastDonationPrompt', Date.now());
+            }, 60000); // Après 1 minute de session
+        }
+    }
+
+    // Fonctions de rendu
+    function renderApp() {
+        renderTabs();
+        renderDashboard();
+        renderUserTabs();
+        renderCommonTab();
+    }
+
+    function renderTabs() {
+        const tabsContainer = document.getElementById('tabs');
+        tabsContainer.innerHTML = `
+            <button class="tab ${appData.currentTab === 'dashboard' ? 'active' : ''}" onclick="switchTab('dashboard')">Tableau de bord</button>
+        `;
+        
+        // Ajouter les onglets utilisateurs (sauf Commun)
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                const tab = document.createElement('button');
+                tab.className = `tab ${appData.currentTab === userId ? 'active' : ''}`;
+                tab.textContent = appData.users[userId].name;
+                tab.onclick = () => switchTab(userId);
+                tabsContainer.appendChild(tab);
+            }
+        }
+        
+        // Ajouter l'onglet Commun en dernier
+        const communTab = document.createElement('button');
+        communTab.className = `tab ${appData.currentTab === 'commun' ? 'active' : ''}`;
+        communTab.textContent = 'Commun';
+        communTab.onclick = () => switchTab('commun');
+        tabsContainer.appendChild(communTab);
+        
+        // Bouton d'ajout tout à la fin
+        const addTab = document.createElement('button');
+        addTab.className = 'add-tab';
+        addTab.textContent = '+';
+        addTab.onclick = addNewTab;
+        tabsContainer.appendChild(addTab);
+    }
+
+    function renderDashboard() {
+        const container = document.getElementById('dashboard-content');
+        container.innerHTML = '';
+        
+        // D'abord, afficher tous les utilisateurs (sauf Commun)
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                renderUserCard(userId, container);
+            }
+        }
+        
+        // Ensuite, afficher Commun en dernier
+        if (appData.users.commun) {
+            renderUserCard('commun', container);
+        }
     }
     
-    // Calculer les jours depuis la première utilisation
-    const daysSinceFirstUse = (Date.now() - parseInt(firstUse)) / (1000 * 60 * 60 * 24);
-    const lastDonationPrompt = localStorage.getItem('lastDonationPrompt');
-    const daysSinceLastPrompt = lastDonationPrompt ? 
-        (Date.now() - parseInt(lastDonationPrompt)) / (1000 * 60 * 60 * 24) : 999;
-    
-    // Afficher après 7 jours, puis tous les 30 jours
-    if (daysSinceFirstUse >= 7 && daysSinceLastPrompt >= 30) {
-        setTimeout(() => {
-            showDonationPopup();
-            localStorage.setItem('lastDonationPrompt', Date.now());
-        }, 60000); // Après 1 minute de session
+    function renderUserCard(userId, container) {
+        const user = appData.users[userId];
+        const totalIncome = user.incomes.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpense = user.expenses.reduce((sum, item) => sum + item.amount, 0);
+        
+        // Calculer la part des dépenses communes
+        let commonShare = 0;
+        if (userId !== 'commun') {
+            appData.commonExpenses.forEach(expense => {
+                if (expense.participants.includes(userId)) {
+                    commonShare += expense.amount / expense.participants.length;
+                }
+            });
+        }
+        
+        const balance = totalIncome - totalExpense - commonShare;
+        
+        const card = document.createElement('div');
+        card.className = 'user-card';
+        card.innerHTML = `
+            <h3>${user.name}</h3>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-label">Revenus</div>
+                    <div class="stat-value income">+${totalIncome.toFixed(2)}€</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Dépenses</div>
+                    <div class="stat-value expense">-${(totalExpense + commonShare).toFixed(2)}€</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Solde</div>
+                    <div class="stat-value balance">${balance.toFixed(2)}€</div>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
     }
-}
 
-// Fermer en cliquant en dehors
-const donationPopup = document.getElementById('donationPopup');
-if (donationPopup) {
-    donationPopup.addEventListener('click', (e) => {
-        if (e.target === donationPopup) {
-            closeDonationPopup();
+    function renderUserTabs() {
+        // Créer les contenus d'onglets pour chaque utilisateur
+        const content = document.querySelector('.content');
+        
+        // Supprimer les anciens onglets utilisateurs
+        document.querySelectorAll('.user-tab-content').forEach(el => el.remove());
+        
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                const tabContent = document.createElement('div');
+                tabContent.id = userId;
+                tabContent.className = `tab-content user-tab-content ${appData.currentTab === userId ? 'active' : ''}`;
+                
+                tabContent.innerHTML = `
+                    <div class="section">
+                        <div class="section-header">
+                            <h2 class="section-title">Revenus</h2>
+                            <button class="btn btn-small" onclick="addIncome('${userId}')">+ Ajouter</button>
+                        </div>
+                        <div id="${userId}-incomes" class="items-list">
+                            ${renderItems(appData.users[userId].incomes, 'income', userId)}
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-header">
+                            <h2 class="section-title">Dépenses</h2>
+                            <button class="btn btn-small" onclick="addExpense('${userId}')">+ Ajouter</button>
+                        </div>
+                        <div id="${userId}-expenses" class="items-list">
+                            ${renderItems(appData.users[userId].expenses, 'expense', userId)}
+                        </div>
+                    </div>
+                    
+                    <div class="section" style="margin-top: 2rem; text-align: center;">
+                        <button class="btn btn-danger" onclick="deleteUser('${userId}')">
+                            <span class="material-icons">delete_forever</span>
+                            Supprimer cet utilisateur
+                        </button>
+                    </div>
+                `;
+                
+                content.appendChild(tabContent);
+            }
+        }
+    }
+
+    function renderCommonTab() {
+        // Rendu des revenus communs
+        const commonIncomes = document.getElementById('commun-incomes');
+        commonIncomes.innerHTML = renderItems(appData.users.commun.incomes, 'income', 'commun');
+        
+        // Rendu des dépenses communes
+        const commonExpenses = document.getElementById('commun-expenses');
+        if (appData.commonExpenses.length === 0) {
+            commonExpenses.innerHTML = '<div class="empty-state">Aucune dépense commune ajoutée</div>';
+        } else {
+            commonExpenses.innerHTML = appData.commonExpenses.map((expense, index) => `
+                <div class="item">
+                    <div class="item-info">
+                        <div class="item-name">${expense.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                            Participants: ${expense.participants.map(p => appData.users[p].name).join(', ')}
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <span class="item-amount expense">-${expense.amount.toFixed(2)}€</span>
+                        <button class="btn btn-small btn-danger" onclick="deleteCommonExpense(${index})">×</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    function renderItems(items, type, userId) {
+        if (items.length === 0) {
+            return '<div class="empty-state">Aucun élément ajouté</div>';
+        }
+        
+        return items.map((item, index) => `
+            <div class="item">
+                <div class="item-info">
+                    <div class="item-name">${item.name}</div>
+                </div>
+                <div class="item-actions">
+                    <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
+                    <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Gestion des onglets
+    function switchTab(tabId) {
+        appData.currentTab = tabId;
+        
+        // Mettre à jour les onglets actifs
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        // Activer le bon onglet
+        const activeTab = Array.from(document.querySelectorAll('.tab')).find(tab => 
+            tab.textContent === (tabId === 'dashboard' ? 'Tableau de bord' : 
+                               tabId === 'commun' ? 'Commun' : 
+                               appData.users[tabId]?.name)
+        );
+        if (activeTab) activeTab.classList.add('active');
+        
+        const activeContent = document.getElementById(tabId);
+        if (activeContent) activeContent.classList.add('active');
+        
+        // Masquer/afficher le FAB selon l'onglet
+        const fabButton = document.getElementById('fabButton');
+        if (tabId === 'dashboard') {
+            fabButton.style.display = 'none';
+        } else {
+            fabButton.style.display = 'flex';
+        }
+        
+        saveData();
+    }
+
+    function addNewTab() {
+        document.getElementById('newTabName').value = '';
+        openModal('addTabModal');
+    }
+
+    function confirmAddTab() {
+        const name = document.getElementById('newTabName').value.trim();
+        if (name) {
+            const userId = 'user_' + Date.now();
+            appData.users[userId] = {
+                name: name,
+                incomes: [],
+                expenses: []
+            };
+            saveData();
+            renderApp();
+            switchTab(userId);
+            closeModal('addTabModal');
+        }
+    }
+
+    // Gestion des revenus
+    function addIncome(userId) {
+        currentUser = userId;
+        document.getElementById('incomeName').value = '';
+        document.getElementById('incomeAmount').value = '';
+        openModal('addIncomeModal');
+    }
+
+    function confirmAddIncome() {
+        const name = document.getElementById('incomeName').value.trim();
+        const amount = parseFloat(document.getElementById('incomeAmount').value);
+        
+        if (name && amount > 0) {
+            appData.users[currentUser].incomes.push({
+                name: name,
+                amount: amount,
+                date: new Date().toISOString()
+            });
+            saveData();
+            renderApp();
+            closeModal('addIncomeModal');
+            trackUserAction();
+        }
+    }
+
+    // Gestion des dépenses
+    function addExpense(userId) {
+        currentUser = userId;
+        document.getElementById('expenseName').value = '';
+        document.getElementById('expenseAmount').value = '';
+        openModal('addExpenseModal');
+    }
+
+    function confirmAddExpense() {
+        const name = document.getElementById('expenseName').value.trim();
+        const amount = parseFloat(document.getElementById('expenseAmount').value);
+        
+        if (name && amount > 0) {
+            appData.users[currentUser].expenses.push({
+                name: name,
+                amount: amount,
+                date: new Date().toISOString()
+            });
+            saveData();
+            renderApp();
+            closeModal('addExpenseModal');
+            trackUserAction();
+        }
+    }
+
+    // Gestion des dépenses communes
+    function addCommonExpense() {
+        document.getElementById('commonExpenseName').value = '';
+        document.getElementById('commonExpenseAmount').value = '';
+        
+        // Générer la liste des participants
+        const participantsList = document.getElementById('participantsList');
+        participantsList.innerHTML = '';
+        
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                const checkbox = document.createElement('div');
+                checkbox.className = 'participant-checkbox';
+                checkbox.innerHTML = `
+                    <input type="checkbox" id="participant_${userId}" value="${userId}">
+                    <label for="participant_${userId}">${appData.users[userId].name}</label>
+                `;
+                participantsList.appendChild(checkbox);
+            }
+        }
+        
+        openModal('addCommonExpenseModal');
+    }
+
+    function confirmAddCommonExpense() {
+        const name = document.getElementById('commonExpenseName').value.trim();
+        const amount = parseFloat(document.getElementById('commonExpenseAmount').value);
+        
+        // Récupérer les participants sélectionnés
+        const participants = [];
+        document.querySelectorAll('#participantsList input[type="checkbox"]:checked').forEach(checkbox => {
+            participants.push(checkbox.value);
+        });
+        
+        if (name && amount > 0 && participants.length > 0) {
+            appData.commonExpenses.push({
+                name: name,
+                amount: amount,
+                participants: participants,
+                date: new Date().toISOString()
+            });
+            saveData();
+            renderApp();
+            closeModal('addCommonExpenseModal');
+            trackUserAction();
+        }
+    }
+
+    // Suppression d'un utilisateur
+    function deleteUser(userId) {
+        const userName = appData.users[userId].name;
+        confirmCallback = () => {
+            // Vérifier si l'utilisateur participe à des dépenses communes
+            const participatesInCommon = appData.commonExpenses.some(expense => 
+                expense.participants.includes(userId)
+            );
+            
+            if (participatesInCommon) {
+                alert(`Impossible de supprimer ${userName} car il/elle participe à des dépenses communes. Retirez d'abord sa participation aux dépenses communes.`);
+                return;
+            }
+            
+            // Supprimer l'utilisateur
+            delete appData.users[userId];
+            
+            // Si on était sur cet onglet, retourner au tableau de bord
+            if (appData.currentTab === userId) {
+                appData.currentTab = 'dashboard';
+            }
+            
+            saveData();
+            renderApp();
+        };
+        showConfirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${userName}" et toutes ses données ?`);
+    }
+
+    // Suppression d'éléments
+    function deleteItem(userId, type, index) {
+        confirmCallback = () => {
+            appData.users[userId][type].splice(index, 1);
+            saveData();
+            renderApp();
+        };
+        showConfirm('Êtes-vous sûr de vouloir supprimer cet élément ?');
+    }
+
+    function deleteCommonExpense(index) {
+        confirmCallback = () => {
+            appData.commonExpenses.splice(index, 1);
+            saveData();
+            renderApp();
+        };
+        showConfirm('Êtes-vous sûr de vouloir supprimer cette dépense commune ?');
+    }
+
+    // Menu FAB
+    let fabMenuOpen = false;
+    
+    function toggleFabMenu() {
+        fabMenuOpen = !fabMenuOpen;
+        const fabMenu = document.getElementById('fabMenu');
+        const fabButton = document.getElementById('fabButton');
+        
+        if (fabMenuOpen) {
+            fabMenu.classList.add('active');
+            fabButton.style.transform = 'rotate(45deg)';
+        } else {
+            fabMenu.classList.remove('active');
+            fabButton.style.transform = 'rotate(0deg)';
+        }
+    }
+    
+    function closeFabMenu() {
+        fabMenuOpen = false;
+        document.getElementById('fabMenu').classList.remove('active');
+        document.getElementById('fabButton').style.transform = 'rotate(0deg)';
+    }
+
+    // Ajout rapide de revenu
+    function quickAddIncome() {
+        closeFabMenu();
+        if (appData.currentTab === 'dashboard' || appData.currentTab === 'commun') {
+            // Si on est sur le tableau de bord ou commun, utiliser le premier utilisateur
+            const firstUser = Object.keys(appData.users).find(id => id !== 'commun');
+            if (firstUser) {
+                addIncome(firstUser);
+            }
+        } else {
+            addIncome(appData.currentTab);
+        }
+    }
+
+    // Ajout rapide de dépense
+    function quickAddExpense() {
+        closeFabMenu();
+        if (appData.currentTab === 'commun') {
+            addCommonExpense();
+        } else if (appData.currentTab === 'dashboard') {
+            // Si on est sur le tableau de bord, utiliser le premier utilisateur
+            const firstUser = Object.keys(appData.users).find(id => id !== 'commun');
+            if (firstUser) {
+                addExpense(firstUser);
+            }
+        } else {
+            addExpense(appData.currentTab);
+        }
+    }
+
+    // Fermer le menu FAB en cliquant ailleurs
+    document.addEventListener('click', (e) => {
+        if (fabMenuOpen && !e.target.closest('.fab') && !e.target.closest('.fab-menu')) {
+            closeFabMenu();
         }
     });
-}
 
-const originalExportData = exportData;
-exportData = function() {
-    originalExportData();
-    trackUserAction();
-    
-    // Message contextuel après export (seulement une fois)
-    if (!localStorage.getItem('exportDonationSuggested')) {
-        setTimeout(() => {
-            if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
-                showDonationPopup();
-            }
-            localStorage.setItem('exportDonationSuggested', 'true');
-        }, 500);
+    // Calculatrice
+    function toggleCalculator() {
+        closeFabMenu();
+        openModal('calculatorModal');
     }
-};
-        // Initialisation
-        document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-            initPWA();
-            renderApp();
-			initDonation();
-            // Masquer le FAB au démarrage si on est sur le tableau de bord
-            if (appData.currentTab === 'dashboard') {
-                document.getElementById('fabButton').style.display = 'none';
-            }
-            setInterval(saveData, 5000); // Sauvegarde automatique toutes les 5 secondes
-        });
 
-        // Fonctions de gestion des données
-        function loadData() {
-    const saved = localStorage.getItem('expenseTrackerData');
-    if (saved) {
-        appData = JSON.parse(saved);
-        // Forcer le mode sombre
-        appData.theme = 'dark';
-        document.body.setAttribute('data-theme', 'dark');
-    } else {
-        // Si pas de données sauvegardées, initialiser en mode sombre
-        appData.theme = 'dark';
-        document.body.setAttribute('data-theme', 'dark');
+    function appendToCalc(value) {
+        if (calcExpression === '0' && value !== '.') {
+            calcExpression = value;
+        } else {
+            calcExpression += value;
+        }
+        updateCalcDisplay();
     }
-}
 
-        function saveData() {
-            localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
-        }
+    function clearCalc() {
+        calcExpression = '0';
+        updateCalcDisplay();
+    }
 
-        // Fonctions de rendu
-        function renderApp() {
-            renderTabs();
-            renderDashboard();
-            renderUserTabs();
-            renderCommonTab();
+    function deleteLastCalc() {
+        if (calcExpression.length > 1) {
+            calcExpression = calcExpression.slice(0, -1);
+        } else {
+            calcExpression = '0';
         }
+        updateCalcDisplay();
+    }
 
-        function renderTabs() {
-            const tabsContainer = document.getElementById('tabs');
-            tabsContainer.innerHTML = `
-                <button class="tab ${appData.currentTab === 'dashboard' ? 'active' : ''}" onclick="switchTab('dashboard')">Tableau de bord</button>
-            `;
-            
-            // Ajouter les onglets utilisateurs (sauf Commun)
-            for (const userId in appData.users) {
-                if (userId !== 'commun') {
-                    const tab = document.createElement('button');
-                    tab.className = `tab ${appData.currentTab === userId ? 'active' : ''}`;
-                    tab.textContent = appData.users[userId].name;
-                    tab.onclick = () => switchTab(userId);
-                    tabsContainer.appendChild(tab);
-                }
-            }
-            
-            // Ajouter l'onglet Commun en dernier
-            const communTab = document.createElement('button');
-            communTab.className = `tab ${appData.currentTab === 'commun' ? 'active' : ''}`;
-            communTab.textContent = 'Commun';
-            communTab.onclick = () => switchTab('commun');
-            tabsContainer.appendChild(communTab);
-            
-            // Bouton d'ajout tout à la fin
-            const addTab = document.createElement('button');
-            addTab.className = 'add-tab';
-            addTab.textContent = '+';
-            addTab.onclick = addNewTab;
-            tabsContainer.appendChild(addTab);
+    function calculateResult() {
+        try {
+            const result = eval(calcExpression);
+            calcExpression = result.toString();
+            updateCalcDisplay();
+        } catch (e) {
+            document.getElementById('calcDisplay').textContent = 'Erreur';
+            calcExpression = '0';
         }
+    }
 
-        function renderDashboard() {
-            const container = document.getElementById('dashboard-content');
-            container.innerHTML = '';
-            
-            // D'abord, afficher tous les utilisateurs (sauf Commun)
-            for (const userId in appData.users) {
-                if (userId !== 'commun') {
-                    renderUserCard(userId, container);
-                }
-            }
-            
-            // Ensuite, afficher Commun en dernier
-            if (appData.users.commun) {
-                renderUserCard('commun', container);
-            }
-        }
+    function updateCalcDisplay() {
+        const display = document.getElementById('calcDisplay');
+        display.textContent = calcExpression;
         
-        function renderUserCard(userId, container) {
+        // Ajuster la taille du texte si nécessaire
+        if (calcExpression.length > 15) {
+            display.style.fontSize = '1rem';
+        } else if (calcExpression.length > 10) {
+            display.style.fontSize = '1.25rem';
+        } else {
+            display.style.fontSize = '1.5rem';
+        }
+    }
+
+    // Gestion du clavier pour la calculatrice
+    function handleCalculatorKeyboard(e) {
+        const modal = document.getElementById('calculatorModal');
+        if (!modal.classList.contains('active')) return;
+        
+        e.preventDefault();
+        
+        // Chiffres
+        if (e.key >= '0' && e.key <= '9') {
+            appendToCalc(e.key);
+        }
+        // Opérateurs
+        else if (e.key === '+' || e.key === '-' || e.key === '*' || e.key === '/') {
+            appendToCalc(e.key);
+        }
+        // Point décimal
+        else if (e.key === '.' || e.key === ',') {
+            appendToCalc('.');
+        }
+        // Égal
+        else if (e.key === 'Enter' || e.key === '=') {
+            calculateResult();
+        }
+        // Effacer
+        else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
+            clearCalc();
+        }
+        // Supprimer dernier caractère
+        else if (e.key === 'Backspace') {
+            deleteLastCalc();
+        }
+    }
+
+    // Ajouter l'écouteur d'événements au chargement
+    document.addEventListener('keydown', handleCalculatorKeyboard);
+
+    // Thème
+    function toggleTheme() {
+        const currentTheme = document.body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.body.setAttribute('data-theme', newTheme);
+        appData.theme = newTheme;
+        saveData();
+    }
+
+    // Paramètres
+    function openSettings() {
+        openModal('settingsModal');
+    }
+
+    function exportData() {
+        const dataStr = JSON.stringify(appData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `depenses_export_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        closeModal('settingsModal');
+    }
+
+    function importData() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        appData = data;
+                        // Forcer le mode sombre après import
+                        appData.theme = 'dark';
+                        document.body.setAttribute('data-theme', 'dark');
+                        saveData();
+                        renderApp();
+                        closeModal('settingsModal');
+                        alert('Données importées avec succès !');
+                    } catch (error) {
+                        alert('Erreur lors de l\'importation des données');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        };
+        input.click();
+    }
+
+    function confirmReset() {
+        confirmCallback = () => {
+            if (confirm('Cette action supprimera TOUTES les données. Êtes-vous vraiment sûr ?')) {
+                appData = {
+                    users: {
+                        'commun': {
+                            name: 'Commun',
+                            incomes: [],
+                            expenses: []
+                        }
+                    },
+                    commonExpenses: [],
+                    currentTab: 'dashboard',
+                    theme: 'dark'
+                };
+                saveData();
+                renderApp();
+                location.reload(); // Recharger la page pour réinitialiser complètement
+                closeModal('settingsModal');
+            }
+        };
+        showConfirm('Voulez-vous vraiment réinitialiser toutes les données ?');
+    }
+
+    // Gestion des modals avec historique
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
+        // Empêcher le scroll du body
+        document.body.style.overflow = 'hidden';
+        // Ajouter un état à l'historique pour gérer le bouton retour
+        history.pushState({ modal: modalId }, '');
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+        // Réactiver le scroll du body
+        document.body.style.overflow = '';
+        // Si on ferme manuellement, on recule dans l'historique
+        if (history.state && history.state.modal === modalId) {
+            history.back();
+        }
+    }
+
+    function showConfirm(message) {
+        const confirmMessageElement = document.getElementById('confirmMessage');
+        if (confirmMessageElement) {
+            confirmMessageElement.textContent = message;
+            document.getElementById('confirmButton').onclick = () => {
+                if (confirmCallback) confirmCallback();
+                closeModal('confirmModal');
+            };
+            openModal('confirmModal');
+        } else {
+            // Fallback si l'élément n'existe pas
+            if (confirm(message) && confirmCallback) {
+                confirmCallback();
+            }
+        }
+    }
+
+    // Gestion du bouton retour sur Android
+    window.addEventListener('popstate', (e) => {
+        const activeModal = document.querySelector('.modal.active');
+        if (activeModal) {
+            activeModal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    });
+
+    // Statistiques
+    function showStats() {
+        const statsContent = document.getElementById('statsContent');
+        
+        // Calculer les statistiques globales
+        let totalRevenue = 0;
+        let totalExpenses = 0;
+        let userStats = [];
+        
+        // Statistiques par utilisateur
+        for (const userId in appData.users) {
             const user = appData.users[userId];
-            const totalIncome = user.incomes.reduce((sum, item) => sum + item.amount, 0);
-            const totalExpense = user.expenses.reduce((sum, item) => sum + item.amount, 0);
+            const userRevenue = user.incomes.reduce((sum, item) => sum + item.amount, 0);
+            const userExpenses = user.expenses.reduce((sum, item) => sum + item.amount, 0);
             
-            // Calculer la part des dépenses communes
+            // Part des dépenses communes
             let commonShare = 0;
             if (userId !== 'commun') {
                 appData.commonExpenses.forEach(expense => {
@@ -457,699 +1075,96 @@ exportData = function() {
                 });
             }
             
-            const balance = totalIncome - totalExpense - commonShare;
-            
-            const card = document.createElement('div');
-            card.className = 'user-card';
-            card.innerHTML = `
-                <h3>${user.name}</h3>
-                <div class="stats">
-                    <div class="stat">
-                        <div class="stat-label">Revenus</div>
-                        <div class="stat-value income">+${totalIncome.toFixed(2)}€</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-label">Dépenses</div>
-                        <div class="stat-value expense">-${(totalExpense + commonShare).toFixed(2)}€</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-label">Solde</div>
-                        <div class="stat-value balance">${balance.toFixed(2)}€</div>
-                    </div>
-                </div>
-            `;
-            container.appendChild(card);
-        }
-
-        function renderUserTabs() {
-            // Créer les contenus d'onglets pour chaque utilisateur
-            const content = document.querySelector('.content');
-            
-            // Supprimer les anciens onglets utilisateurs
-            document.querySelectorAll('.user-tab-content').forEach(el => el.remove());
-            
-            for (const userId in appData.users) {
-                if (userId !== 'commun') {
-                    const tabContent = document.createElement('div');
-                    tabContent.id = userId;
-                    tabContent.className = `tab-content user-tab-content ${appData.currentTab === userId ? 'active' : ''}`;
-                    
-                    tabContent.innerHTML = `
-                        <div class="section">
-                            <div class="section-header">
-                                <h2 class="section-title">Revenus</h2>
-                                <button class="btn btn-small" onclick="addIncome('${userId}')">+ Ajouter</button>
-                            </div>
-                            <div id="${userId}-incomes" class="items-list">
-                                ${renderItems(appData.users[userId].incomes, 'income', userId)}
-                            </div>
-                        </div>
-
-                        <div class="section">
-                            <div class="section-header">
-                                <h2 class="section-title">Dépenses</h2>
-                                <button class="btn btn-small" onclick="addExpense('${userId}')">+ Ajouter</button>
-                            </div>
-                            <div id="${userId}-expenses" class="items-list">
-                                ${renderItems(appData.users[userId].expenses, 'expense', userId)}
-                            </div>
-                        </div>
-                        
-                        <div class="section" style="margin-top: 2rem; text-align: center;">
-                            <button class="btn btn-danger" onclick="deleteUser('${userId}')">
-                                🗑️ Supprimer cet utilisateur
-                            </button>
-                        </div>
-                    `;
-                    
-                    content.appendChild(tabContent);
-                }
-            }
-        }
-
-        function renderCommonTab() {
-            // Rendu des revenus communs
-            const commonIncomes = document.getElementById('commun-incomes');
-            commonIncomes.innerHTML = renderItems(appData.users.commun.incomes, 'income', 'commun');
-            
-            // Rendu des dépenses communes
-            const commonExpenses = document.getElementById('commun-expenses');
-            if (appData.commonExpenses.length === 0) {
-                commonExpenses.innerHTML = '<div class="empty-state">Aucune dépense commune ajoutée</div>';
-            } else {
-                commonExpenses.innerHTML = appData.commonExpenses.map((expense, index) => `
-                    <div class="item">
-                        <div class="item-info">
-                            <div class="item-name">${expense.name}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                                Participants: ${expense.participants.map(p => appData.users[p].name).join(', ')}
-                            </div>
-                        </div>
-                        <div class="item-actions">
-                            <span class="item-amount expense">-${expense.amount.toFixed(2)}€</span>
-                            <button class="btn btn-small btn-danger" onclick="deleteCommonExpense(${index})">×</button>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        }
-
-        function renderItems(items, type, userId) {
-            if (items.length === 0) {
-                return '<div class="empty-state">Aucun élément ajouté</div>';
-            }
-            
-            return items.map((item, index) => `
-                <div class="item">
-                    <div class="item-info">
-                        <div class="item-name">${item.name}</div>
-                    </div>
-                    <div class="item-actions">
-                        <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
-                        <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Gestion des onglets
-        function switchTab(tabId) {
-            appData.currentTab = tabId;
-            
-            // Mettre à jour les onglets actifs
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            // Activer le bon onglet
-            const activeTab = Array.from(document.querySelectorAll('.tab')).find(tab => 
-                tab.textContent === (tabId === 'dashboard' ? 'Tableau de bord' : 
-                                   tabId === 'commun' ? 'Commun' : 
-                                   appData.users[tabId]?.name)
-            );
-            if (activeTab) activeTab.classList.add('active');
-            
-            const activeContent = document.getElementById(tabId);
-            if (activeContent) activeContent.classList.add('active');
-            
-            // Masquer/afficher le FAB selon l'onglet
-            const fabButton = document.getElementById('fabButton');
-            if (tabId === 'dashboard') {
-                fabButton.style.display = 'none';
-            } else {
-                fabButton.style.display = 'flex';
-            }
-            
-            saveData();
-        }
-
-        function addNewTab() {
-            document.getElementById('newTabName').value = '';
-            openModal('addTabModal');
-        }
-
-        function confirmAddTab() {
-            const name = document.getElementById('newTabName').value.trim();
-            if (name) {
-                const userId = 'user_' + Date.now();
-                appData.users[userId] = {
-                    name: name,
-                    incomes: [],
-                    expenses: []
-                };
-                saveData();
-                renderApp();
-                switchTab(userId);
-                closeModal('addTabModal');
-            }
-        }
-
-        // Gestion des revenus
-        function addIncome(userId) {
-            currentUser = userId;
-            document.getElementById('incomeName').value = '';
-            document.getElementById('incomeAmount').value = '';
-            openModal('addIncomeModal');
-        }
-
-        function confirmAddIncome() {
-    const name = document.getElementById('incomeName').value.trim();
-    const amount = parseFloat(document.getElementById('incomeAmount').value);
-    
-    if (name && amount > 0) {
-        appData.users[currentUser].incomes.push({
-            name: name,
-            amount: amount,
-            date: new Date().toISOString()
-        });
-        saveData();
-        renderApp();
-        closeModal('addIncomeModal');
-        trackUserAction(); // <--- AJOUTEZ L'APPEL ICI
-    }
-}
-
-        // Gestion des dépenses
-        function addExpense(userId) {
-            currentUser = userId;
-            document.getElementById('expenseName').value = '';
-            document.getElementById('expenseAmount').value = '';
-            openModal('addExpenseModal');
-        }
-
-        function confirmAddExpense() {
-    const name = document.getElementById('expenseName').value.trim();
-    const amount = parseFloat(document.getElementById('expenseAmount').value);
-    
-    if (name && amount > 0) {
-        appData.users[currentUser].expenses.push({
-            name: name,
-            amount: amount,
-            date: new Date().toISOString()
-        });
-        saveData();
-        renderApp();
-        closeModal('addExpenseModal');
-        trackUserAction(); // <--- AJOUTEZ L'APPEL ICI
-    }
-}
-
-        // Gestion des dépenses communes
-        function addCommonExpense() {
-            document.getElementById('commonExpenseName').value = '';
-            document.getElementById('commonExpenseAmount').value = '';
-            
-            // Générer la liste des participants
-            const participantsList = document.getElementById('participantsList');
-            participantsList.innerHTML = '';
-            
-            for (const userId in appData.users) {
-                if (userId !== 'commun') {
-                    const checkbox = document.createElement('div');
-                    checkbox.className = 'participant-checkbox';
-                    checkbox.innerHTML = `
-                        <input type="checkbox" id="participant_${userId}" value="${userId}">
-                        <label for="participant_${userId}">${appData.users[userId].name}</label>
-                    `;
-                    participantsList.appendChild(checkbox);
-                }
-            }
-            
-            openModal('addCommonExpenseModal');
-        }
-
-        function confirmAddCommonExpense() {
-            const name = document.getElementById('commonExpenseName').value.trim();
-            const amount = parseFloat(document.getElementById('commonExpenseAmount').value);
-            
-            // Récupérer les participants sélectionnés
-            const participants = [];
-            document.querySelectorAll('#participantsList input[type="checkbox"]:checked').forEach(checkbox => {
-                participants.push(checkbox.value);
+            userStats.push({
+                name: user.name,
+                revenue: userRevenue,
+                expenses: userExpenses + commonShare,
+                balance: userRevenue - userExpenses - commonShare
             });
             
-            if (name && amount > 0 && participants.length > 0) {
-                appData.commonExpenses.push({
-                    name: name,
-                    amount: amount,
-                    participants: participants,
-                    date: new Date().toISOString()
-                });
-                saveData();
-                renderApp();
-                closeModal('addCommonExpenseModal');
-            }
-        }
-
-        // Suppression d'un utilisateur
-        function deleteUser(userId) {
-            const userName = appData.users[userId].name;
-            confirmCallback = () => {
-                // Vérifier si l'utilisateur participe à des dépenses communes
-                const participatesInCommon = appData.commonExpenses.some(expense => 
-                    expense.participants.includes(userId)
-                );
-                
-                if (participatesInCommon) {
-                    alert(`Impossible de supprimer ${userName} car il/elle participe à des dépenses communes. Retirez d'abord sa participation aux dépenses communes.`);
-                    return;
-                }
-                
-                // Supprimer l'utilisateur
-                delete appData.users[userId];
-                
-                // Si on était sur cet onglet, retourner au tableau de bord
-                if (appData.currentTab === userId) {
-                    appData.currentTab = 'dashboard';
-                }
-                
-                saveData();
-                renderApp();
-            };
-            showConfirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${userName}" et toutes ses données ?`);
-        }
-
-        // Suppression d'éléments
-        function deleteItem(userId, type, index) {
-            confirmCallback = () => {
-                appData.users[userId][type].splice(index, 1);
-                saveData();
-                renderApp();
-            };
-            showConfirm('Êtes-vous sûr de vouloir supprimer cet élément ?');
-        }
-
-        function deleteCommonExpense(index) {
-            confirmCallback = () => {
-                appData.commonExpenses.splice(index, 1);
-                saveData();
-                renderApp();
-            };
-            showConfirm('Êtes-vous sûr de vouloir supprimer cette dépense commune ?');
-        }
-
-        // Menu FAB
-        let fabMenuOpen = false;
-        
-        function toggleFabMenu() {
-            fabMenuOpen = !fabMenuOpen;
-            const fabMenu = document.getElementById('fabMenu');
-            const fabButton = document.getElementById('fabButton');
-            
-            if (fabMenuOpen) {
-                fabMenu.classList.add('active');
-                fabButton.style.transform = 'rotate(45deg)';
-            } else {
-                fabMenu.classList.remove('active');
-                fabButton.style.transform = 'rotate(0deg)';
-            }
+            totalRevenue += userRevenue;
+            totalExpenses += userExpenses + (userId === 'commun' ? 0 : commonShare);
         }
         
-        function closeFabMenu() {
-            fabMenuOpen = false;
-            document.getElementById('fabMenu').classList.remove('active');
-            document.getElementById('fabButton').style.transform = 'rotate(0deg)';
-        }
-
-        // Ajout rapide de revenu
-        function quickAddIncome() {
-            closeFabMenu();
-            if (appData.currentTab === 'dashboard' || appData.currentTab === 'commun') {
-                // Si on est sur le tableau de bord ou commun, utiliser le premier utilisateur
-                const firstUser = Object.keys(appData.users).find(id => id !== 'commun');
-                if (firstUser) {
-                    addIncome(firstUser);
-                }
-            } else {
-                addIncome(appData.currentTab);
-            }
-        }
-
-        // Ajout rapide de dépense
-        function quickAddExpense() {
-            closeFabMenu();
-            if (appData.currentTab === 'commun') {
-                addCommonExpense();
-            } else if (appData.currentTab === 'dashboard') {
-                // Si on est sur le tableau de bord, utiliser le premier utilisateur
-                const firstUser = Object.keys(appData.users).find(id => id !== 'commun');
-                if (firstUser) {
-                    addExpense(firstUser);
-                }
-            } else {
-                addExpense(appData.currentTab);
-            }
-        }
-
-        // Fermer le menu FAB en cliquant ailleurs
-        document.addEventListener('click', (e) => {
-            if (fabMenuOpen && !e.target.closest('.fab') && !e.target.closest('.fab-menu')) {
-                closeFabMenu();
-            }
-        });
-
-        // Calculatrice
-        function toggleCalculator() {
-            closeFabMenu();
-            openModal('calculatorModal');
-        }
-
-        function appendToCalc(value) {
-            if (calcExpression === '0' && value !== '.') {
-                calcExpression = value;
-            } else {
-                calcExpression += value;
-            }
-            updateCalcDisplay();
-        }
-
-        function clearCalc() {
-            calcExpression = '0';
-            updateCalcDisplay();
-        }
-
-        function deleteLastCalc() {
-            if (calcExpression.length > 1) {
-                calcExpression = calcExpression.slice(0, -1);
-            } else {
-                calcExpression = '0';
-            }
-            updateCalcDisplay();
-        }
-
-        function calculateResult() {
-            try {
-                const result = eval(calcExpression);
-                calcExpression = result.toString();
-                updateCalcDisplay();
-            } catch (e) {
-                document.getElementById('calcDisplay').textContent = 'Erreur';
-                calcExpression = '0';
-            }
-        }
-
-        function updateCalcDisplay() {
-            const display = document.getElementById('calcDisplay');
-            display.textContent = calcExpression;
-            
-            // Ajuster la taille du texte si nécessaire
-            if (calcExpression.length > 15) {
-                display.style.fontSize = '1rem';
-            } else if (calcExpression.length > 10) {
-                display.style.fontSize = '1.25rem';
-            } else {
-                display.style.fontSize = '1.5rem';
-            }
-        }
-
-        // Gestion du clavier pour la calculatrice
-        function handleCalculatorKeyboard(e) {
-            const modal = document.getElementById('calculatorModal');
-            if (!modal.classList.contains('active')) return;
-            
-            e.preventDefault();
-            
-            // Chiffres
-            if (e.key >= '0' && e.key <= '9') {
-                appendToCalc(e.key);
-            }
-            // Opérateurs
-            else if (e.key === '+' || e.key === '-' || e.key === '*' || e.key === '/') {
-                appendToCalc(e.key);
-            }
-            // Point décimal
-            else if (e.key === '.' || e.key === ',') {
-                appendToCalc('.');
-            }
-            // Égal
-            else if (e.key === 'Enter' || e.key === '=') {
-                calculateResult();
-            }
-            // Effacer
-            else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
-                clearCalc();
-            }
-            // Supprimer dernier caractère
-            else if (e.key === 'Backspace') {
-                deleteLastCalc();
-            }
-        }
-
-        // Ajouter l'écouteur d'événements au chargement
-        document.addEventListener('keydown', handleCalculatorKeyboard);
-
-        // Thème
-        function toggleTheme() {
-            const currentTheme = document.body.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            document.body.setAttribute('data-theme', newTheme);
-            appData.theme = newTheme;
-            saveData();
-        }
-
-        // Paramètres
-        function openSettings() {
-            openModal('settingsModal');
-        }
-
-        function exportData() {
-            const dataStr = JSON.stringify(appData, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `depenses_export_${new Date().toISOString().split('T')[0]}.json`;
-            link.click();
-            URL.revokeObjectURL(url);
-            closeModal('settingsModal');
-        }
-
-        function importData() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        try {
-                            const data = JSON.parse(event.target.result);
-                            appData = data;
-                            saveData();
-                            renderApp();
-                            closeModal('settingsModal');
-                            alert('Données importées avec succès !');
-                        } catch (error) {
-                            alert('Erreur lors de l\'importation des données');
-                        }
-                    };
-                    reader.readAsText(file);
-                }
-            };
-            input.click();
-        }
-
-        function confirmReset() {
-            confirmCallback = () => {
-                if (confirm('Cette action supprimera TOUTES les données. Êtes-vous vraiment sûr ?')) {
-                    appData = {
-                        users: {
-                            'commun': {
-                                name: 'Commun',
-                                incomes: [],
-                                expenses: []
-                            }
-                        },
-                        commonExpenses: [],
-                        currentTab: 'dashboard',
-                        theme: 'light'
-                    };
-                    saveData();
-                    renderApp();
-                    location.reload(); // Recharger la page pour réinitialiser complètement
-                    closeModal('settingsModal');
-                }
-            };
-            showConfirm('Voulez-vous vraiment réinitialiser toutes les données ?');
-        }
-
-        // Gestion des modals avec historique
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
-            // Empêcher le scroll du body
-            document.body.style.overflow = 'hidden';
-            // Ajouter un état à l'historique pour gérer le bouton retour
-            history.pushState({ modal: modalId }, '');
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-            // Réactiver le scroll du body
-            document.body.style.overflow = '';
-            // Si on ferme manuellement, on recule dans l'historique
-            if (history.state && history.state.modal === modalId) {
-                history.back();
-            }
-        }
-
-        function showConfirm(message) {
-            const confirmMessageElement = document.getElementById('confirmMessage');
-            if (confirmMessageElement) {
-                confirmMessageElement.textContent = message;
-                document.getElementById('confirmButton').onclick = () => {
-                    if (confirmCallback) confirmCallback();
-                    closeModal('confirmModal');
-                };
-                openModal('confirmModal');
-            } else {
-                // Fallback si l'élément n'existe pas
-                if (confirm(message) && confirmCallback) {
-                    confirmCallback();
-                }
-            }
-        }
-
-        // Gestion du bouton retour sur Android
-        window.addEventListener('popstate', (e) => {
-            const activeModal = document.querySelector('.modal.active');
-            if (activeModal) {
-                activeModal.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        });
-
-        // Statistiques
-        function showStats() {
-            const statsContent = document.getElementById('statsContent');
-            
-            // Calculer les statistiques globales
-            let totalRevenue = 0;
-            let totalExpenses = 0;
-            let userStats = [];
-            
-            // Statistiques par utilisateur
-            for (const userId in appData.users) {
-                const user = appData.users[userId];
-                const userRevenue = user.incomes.reduce((sum, item) => sum + item.amount, 0);
-                const userExpenses = user.expenses.reduce((sum, item) => sum + item.amount, 0);
-                
-                // Part des dépenses communes
-                let commonShare = 0;
-                if (userId !== 'commun') {
-                    appData.commonExpenses.forEach(expense => {
-                        if (expense.participants.includes(userId)) {
-                            commonShare += expense.amount / expense.participants.length;
-                        }
-                    });
-                }
-                
-                userStats.push({
-                    name: user.name,
-                    revenue: userRevenue,
-                    expenses: userExpenses + commonShare,
-                    balance: userRevenue - userExpenses - commonShare
-                });
-                
-                totalRevenue += userRevenue;
-                totalExpenses += userExpenses + (userId === 'commun' ? 0 : commonShare);
-            }
-            
-            // Total des dépenses communes
-            const totalCommonExpenses = appData.commonExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-            
-            // Générer le HTML
-            statsContent.innerHTML = `
-                <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
-                    <h3 style="margin-bottom: 1rem;">Vue d'ensemble</h3>
-                    <div style="display: grid; gap: 0.5rem;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Total des revenus :</span>
-                            <span style="color: var(--success); font-weight: bold;">+${totalRevenue.toFixed(2)}€</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Total des dépenses :</span>
-                            <span style="color: var(--danger); font-weight: bold;">-${totalExpenses.toFixed(2)}€</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Dépenses communes :</span>
-                            <span style="color: var(--warning); font-weight: bold;">${totalCommonExpenses.toFixed(2)}€</span>
-                        </div>
-                        <hr style="border-color: var(--border);">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Solde global :</span>
-                            <span style="color: var(--primary); font-weight: bold; font-size: 1.25rem;">${(totalRevenue - totalExpenses).toFixed(2)}€</span>
-                        </div>
+        // Total des dépenses communes
+        const totalCommonExpenses = appData.commonExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+        
+        // Générer le HTML
+        statsContent.innerHTML = `
+            <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
+                <h3 style="margin-bottom: 1rem;">Vue d'ensemble</h3>
+                <div style="display: grid; gap: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Total des revenus :</span>
+                        <span style="color: var(--success); font-weight: bold;">+${totalRevenue.toFixed(2)}€</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Total des dépenses :</span>
+                        <span style="color: var(--danger); font-weight: bold;">-${totalExpenses.toFixed(2)}€</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Dépenses communes :</span>
+                        <span style="color: var(--warning); font-weight: bold;">${totalCommonExpenses.toFixed(2)}€</span>
+                    </div>
+                    <hr style="border-color: var(--border);">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Solde global :</span>
+                        <span style="color: var(--primary); font-weight: bold; font-size: 1.25rem;">${(totalRevenue - totalExpenses).toFixed(2)}€</span>
                     </div>
                 </div>
-                
-                <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
-                    <h3 style="margin-bottom: 1rem;">Par utilisateur</h3>
-                    <div style="display: grid; gap: 0.75rem;">
-                        ${userStats.map(user => `
-                            <div style="padding: 0.5rem; background-color: var(--bg-primary); border-radius: 6px;">
-                                <strong>${user.name}</strong>
-                                <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.25rem; margin-top: 0.5rem; font-size: 0.875rem;">
-                                    <span>Revenus :</span>
-                                    <span style="color: var(--success);">+${user.revenue.toFixed(2)}€</span>
-                                    <span>Dépenses :</span>
-                                    <span style="color: var(--danger);">-${user.expenses.toFixed(2)}€</span>
-                                    <span>Solde :</span>
-                                    <span style="color: var(--primary); font-weight: bold;">${user.balance.toFixed(2)}€</span>
-                                </div>
+            </div>
+            
+            <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
+                <h3 style="margin-bottom: 1rem;">Par utilisateur</h3>
+                <div style="display: grid; gap: 0.75rem;">
+                    ${userStats.map(user => `
+                        <div style="padding: 0.5rem; background-color: var(--bg-primary); border-radius: 6px;">
+                            <strong>${user.name}</strong>
+                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.25rem; margin-top: 0.5rem; font-size: 0.875rem;">
+                                <span>Revenus :</span>
+                                <span style="color: var(--success);">+${user.revenue.toFixed(2)}€</span>
+                                <span>Dépenses :</span>
+                                <span style="color: var(--danger);">-${user.expenses.toFixed(2)}€</span>
+                                <span>Solde :</span>
+                                <span style="color: var(--primary); font-weight: bold;">${user.balance.toFixed(2)}€</span>
                             </div>
-                        `).join('')}
-                    </div>
+                        </div>
+                    `).join('')}
                 </div>
-                
-                <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
-                    <h3 style="margin-bottom: 1rem;">Informations</h3>
-                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                        <p>Nombre d'utilisateurs : ${Object.keys(appData.users).length - 1}</p>
-                        <p>Nombre de dépenses communes : ${appData.commonExpenses.length}</p>
-                        <p>Dernière sauvegarde : ${new Date().toLocaleString('fr-FR')}</p>
-                    </div>
-                </div>
-            `;
+            </div>
             
-            openModal('statsModal');
+            <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
+                <h3 style="margin-bottom: 1rem;">Informations</h3>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                    <p>Nombre d'utilisateurs : ${Object.keys(appData.users).length - 1}</p>
+                    <p>Nombre de dépenses communes : ${appData.commonExpenses.length}</p>
+                    <p>Dernière sauvegarde : ${new Date().toLocaleString('fr-FR')}</p>
+                </div>
+            </div>
+        `;
+        
+        openModal('statsModal');
+    }
+
+    // PWA et installation
+    function initPWA() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(console.error);
         }
-            // PWA et installation
-        function initPWA() {
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('./sw.js').catch(console.error);
-            }
+        
+        // Gestion de l'installation PWA
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
             
-            // Gestion de l'installation PWA
-            let deferredPrompt;
-            
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                
-                // Créer un bouton d'installation personnalisé
+            // Créer un bouton d'installation personnalisé
+            const existingBtn = document.querySelector('.install-btn-pwa');
+            if (!existingBtn) {
                 const installBtn = document.createElement('button');
                 installBtn.textContent = '📱 Installer l\'app';
-                installBtn.className = 'btn';
+                installBtn.className = 'btn install-btn-pwa';
                 installBtn.style.position = 'fixed';
                 installBtn.style.bottom = '100px';
                 installBtn.style.right = '20px';
@@ -1163,19 +1178,20 @@ exportData = function() {
                     deferredPrompt = null;
                 };
                 document.body.appendChild(installBtn);
-            });
-			
-			// Détection Firefox
-	if (navigator.userAgent.includes('Firefox')) {
-    setTimeout(() => {
-        if (!localStorage.getItem('firefoxNoticeShown')) {
-            alert('📱 Pour installer cette app sur Firefox :\n\n1. Ajoutez la page aux favoris\n2. Épinglez-la à votre écran d\'accueil\n\nVos données sont sauvegardées localement.');
-            localStorage.setItem('firefoxNoticeShown', 'true');
+            }
+        });
+        
+        // Détection Firefox
+        if (navigator.userAgent.includes('Firefox')) {
+            setTimeout(() => {
+                if (!localStorage.getItem('firefoxNoticeShown')) {
+                    alert('📱 Pour installer cette app sur Firefox :\n\n1. Ajoutez la page aux favoris\n2. Épinglez-la à votre écran d\'accueil\n\nVos données sont sauvegardées localement.');
+                    localStorage.setItem('firefoxNoticeShown', 'true');
+                }
+            }, 3000);
         }
-    }, 3000);
-	}
-        }
-    </script>
+    }
+</script>
 	<!-- Popup de donation -->
 <div id="donationPopup" class="donation-overlay" style="display: none;">
     <div class="donation-popup">
