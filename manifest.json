@@ -1,58 +1,142 @@
 {
-  "name": "Gestionnaire de Dépenses",
-  "short_name": "Dépenses",
-  "id": "/index.html",
-  "description": "Application de gestion des dépenses personnelles",
-  "start_url": "./index.html",
-  "scope": "./",
+  "name": "Gestionnaire de Dépenses Multi-utilisateur",
+  "short_name": "Mes Dépenses",
+  "description": "Gérez facilement vos dépenses personnelles et communes entre plusieurs utilisateurs",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#3B82F6",
-  "background_color": "#111827",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
+  "theme_color": "#2563eb",
+  "background_color": "#1f2937",
+  "lang": "fr-FR",
+  "dir": "ltr",
+  "categories": ["finance", "productivity", "utilities"],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "prefer_related_applications": false,
-  "categories": ["finance", "productivity"],
-  "icons": [
-  {
-    "src": "images/icon-192.png",
-    "sizes": "192x192",
-    "type": "image/png",
-    "purpose": "any"
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "edge_side_panel": {
+    "preferred_width": 480
   },
-  {
-    "src": "images/icon-192-maskable.png",
-    "sizes": "192x192",
-    "type": "image/png",
-    "purpose": "maskable"
-  },
-  {
-    "src": "images/icon-512.png",
-    "sizes": "512x512",
-    "type": "image/png",
-    "purpose": "any"
-  },
-  {
-    "src": "images/icon-512-maskable.png",
-    "sizes": "512x512",
-    "type": "image/png",
-    "purpose": "maskable"
-  }
-],
-  "screenshots": [
-  {
-    "src": "images/screen2.png",
-    "type": "image/png",
-    "sizes": "1280x720"
-  },
-  {
-    "src": "images/screen3.png",
-    "type": "image/png",
-    "sizes": "720x1280"
-  },
+  "shortcuts": [
     {
-      "src": "images/screen1.png",
+      "name": "Ajouter une dépense",
+      "short_name": "Nouvelle dépense",
+      "description": "Ajouter rapidement une nouvelle dépense",
+      "url": "/?action=add-expense",
+      "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Voir les statistiques",
+      "short_name": "Stats",
+      "description": "Consulter vos statistiques financières",
+      "url": "/?action=stats",
+      "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/images/icon-48.png",
+      "sizes": "48x48",
       "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/images/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/screen1.png",
       "sizes": "1280x720",
-      "form_factor": "wide"
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Tableau de bord principal"
+    },
+    {
+      "src": "/images/screen2.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Gestion des dépenses"
+    },
+    {
+      "src": "/images/screen3.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Vue mobile"
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+expense",
+      "url": "/?expense=%s"
     }
   ]
 }

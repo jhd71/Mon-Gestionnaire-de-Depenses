@@ -1,42 +1,42 @@
-// sw.js - Version améliorée pour Firefox/Opera
+// sw.js - Service Worker amélioré pour PWA complète
 
-const CACHE_NAME = 'gestionnaire-depenses-cache-v1.4';
-const URLS_TO_CACHE = [
-  './',
-  './index.html',
-  './styles.css',
-  './manifest.json',
-  './favicon.ico',
-  './images/paypal-icon.png',
-  './images/icon-192.png',
-  './images/icon-192-maskable.png',
-  './images/icon-512-maskable.png',
-  './images/screen1.png',
-  './images/screen2.png',
-  './images/screen3.png',
-  './images/icon-512.png'
+const CACHE_NAME = 'gestionnaire-depenses-v2.0';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/manifest.json',
+  '/favicon.ico',
+  '/images/icon-192.png',
+  '/images/icon-512.png',
+  '/images/icon-192-maskable.png',
+  '/images/icon-512-maskable.png',
+  '/images/screen1.png',
+  '/images/screen2.png',
+  '/images/screen3.png',
+  'https://fonts.googleapis.com/icon?family=Material+Icons'
 ];
 
-// Installation
+// Installation du Service Worker
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Service Worker: Cache ouvert');
-        return cache.addAll(URLS_TO_CACHE);
+        console.log('Cache ouvert');
+        return cache.addAll(urlsToCache);
       })
       .then(() => self.skipWaiting())
   );
 });
 
-// Activation
+// Activation et nettoyage des anciens caches
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
-            console.log('Service Worker: Suppression ancien cache', cacheName);
+            console.log('Suppression du cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -45,34 +45,43 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch avec stratégie Cache First
+// Stratégie de cache - Network First avec fallback
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then(response => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request).then(response => {
-          // Ne pas mettre en cache les requêtes non-GET
-          if (!event.request.url.startsWith('http') || event.request.method !== 'GET') {
-            return response;
-          }
-          
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then(cache => {
+        // Cloner la réponse car elle ne peut être utilisée qu'une fois
+        const responseToCache = response.clone();
+        
+        caches.open(CACHE_NAME)
+          .then(cache => {
+            // Ne mettre en cache que les requêtes GET réussies
+            if (event.request.method === 'GET' && response.status === 200) {
               cache.put(event.request, responseToCache);
-            });
-          
-          return response;
-        });
+            }
+          });
+        
+        return response;
       })
       .catch(() => {
-        // Page offline si nécessaire
-        if (event.request.destination === 'document') {
-          return caches.match('./index.html');
-        }
+        // Si le réseau échoue, chercher dans le cache
+        return caches.match(event.request)
+          .then(response => {
+            if (response) {
+              return response;
+            }
+            // Si pas dans le cache et c'est une navigation, retourner index.html
+            if (event.request.mode === 'navigate') {
+              return caches.match('/index.html');
+            }
+          });
       })
   );
+});
+
+// Gestion des messages pour mise à jour
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

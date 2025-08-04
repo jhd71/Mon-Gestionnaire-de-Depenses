@@ -12,6 +12,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="apple-touch-icon" href="./images/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./images/icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="./images/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="./images/icon-16.png">
+<meta name="msapplication-TileColor" content="#2563eb">
+<meta name="msapplication-TileImage" content="./images/icon-144.png">
 </head>
 <body>
     <div class="header">
@@ -1159,51 +1164,149 @@
         openModal('statsModal');
     }
 
-    // PWA et installation
-    function initPWA() {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(console.error);
-        }
-        
-        // Gestion de l'installation PWA
-        let deferredPrompt;
-        
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            
-            // Créer un bouton d'installation personnalisé
-            const existingBtn = document.querySelector('.install-btn-pwa');
-            if (!existingBtn) {
-                const installBtn = document.createElement('button');
-                installBtn.textContent = '📱 Installer l\'app';
-                installBtn.className = 'btn install-btn-pwa';
-                installBtn.style.position = 'fixed';
-                installBtn.style.bottom = '100px';
-                installBtn.style.right = '20px';
-                installBtn.style.zIndex = '100';
-                installBtn.onclick = async () => {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                        installBtn.remove();
-                    }
-                    deferredPrompt = null;
-                };
-                document.body.appendChild(installBtn);
-            }
-        });
-        
-        // Détection Firefox
-        if (navigator.userAgent.includes('Firefox')) {
-            setTimeout(() => {
-                if (!localStorage.getItem('firefoxNoticeShown')) {
-                    alert('📱 Pour installer cette app sur Firefox :\n\n1. Ajoutez la page aux favoris\n2. Épinglez-la à votre écran d\'accueil\n\nVos données sont sauvegardées localement.');
-                    localStorage.setItem('firefoxNoticeShown', 'true');
-                }
-            }, 3000);
-        }
+    // PWA et installation améliorée
+function initPWA() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then(registration => {
+                console.log('Service Worker enregistré avec succès:', registration);
+                
+                // Vérifier les mises à jour
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // Nouveau service worker disponible
+                            if (confirm('Une nouvelle version est disponible ! Voulez-vous mettre à jour ?')) {
+                                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+            })
+            .catch(error => {
+                console.error('Erreur Service Worker:', error);
+            });
     }
+    
+    // Détection de l'installation PWA
+    let deferredPrompt;
+    const installBtn = document.getElementById('installAppBtn');
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Afficher le bouton d'installation dans les paramètres
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+        }
+        
+        // Afficher une bannière d'installation après 30 secondes
+        setTimeout(() => {
+            if (deferredPrompt && !localStorage.getItem('installDeclined')) {
+                showInstallBanner();
+            }
+        }, 30000);
+    });
+    
+    // Gestionnaire d'installation
+    window.installApp = async () => {
+        if (!deferredPrompt) {
+            alert('L\'application est déjà installée ou votre navigateur ne supporte pas l\'installation.');
+            return;
+        }
+        
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        if (outcome === 'accepted') {
+            console.log('Installation acceptée');
+            hideInstallBanner();
+            if (installBtn) {
+                installBtn.style.display = 'none';
+            }
+        } else {
+            localStorage.setItem('installDeclined', 'true');
+        }
+        
+        deferredPrompt = null;
+    };
+    
+    // Détecter si l'app est installée
+    window.addEventListener('appinstalled', () => {
+        console.log('PWA installée avec succès');
+        hideInstallBanner();
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    
+    // Vérifier si on est en mode standalone
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        console.log('App lancée en mode standalone');
+    }
+}
+
+// Bannière d'installation
+function showInstallBanner() {
+    const existingBanner = document.getElementById('installBanner');
+    if (existingBanner) return;
+    
+    const banner = document.createElement('div');
+    banner.id = 'installBanner';
+    banner.innerHTML = `
+        <div style="
+            position: fixed;
+            bottom: 80px;
+            left: 1rem;
+            right: 1rem;
+            background: var(--primary-gradient);
+            color: white;
+            padding: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            z-index: 1000;
+            animation: slideUp 0.3s ease-out;
+        ">
+            <span class="material-icons" style="font-size: 2rem;">install_mobile</span>
+            <div style="flex: 1;">
+                <strong style="display: block; margin-bottom: 0.25rem;">Installer l'application</strong>
+                <span style="font-size: 0.875rem; opacity: 0.9;">Accédez rapidement à vos dépenses depuis votre écran d'accueil</span>
+            </div>
+            <button onclick="installApp()" style="
+                background: white;
+                color: var(--primary);
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+            ">Installer</button>
+            <button onclick="hideInstallBanner()" style="
+                background: transparent;
+                color: white;
+                border: none;
+                padding: 0.5rem;
+                cursor: pointer;
+                font-size: 1.5rem;
+            ">×</button>
+        </div>
+    `;
+    
+    document.body.appendChild(banner);
+}
+
+function hideInstallBanner() {
+    const banner = document.getElementById('installBanner');
+    if (banner) {
+        banner.remove();
+    }
+}
 </script>
 	<!-- Popup de donation -->
 <div id="donationPopup" class="donation-overlay" style="display: none;">
