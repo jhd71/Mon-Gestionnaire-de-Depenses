@@ -1133,3 +1133,15 @@ body {
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
 }
+
+/* Animation pour la bannière d'installation */
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
