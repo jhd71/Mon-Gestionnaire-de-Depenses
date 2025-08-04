@@ -1212,24 +1212,29 @@ function initPWA() {
         // Ajouter un bouton d'installation dans le header
         addInstallButtonToHeader();
         
-        // Afficher une bannière d'installation après 2 minutes (au lieu de 30 secondes)
-        // Seulement si l'utilisateur n'a pas déjà refusé et a fait au moins une action
-        let userInteracted = false;
-        document.addEventListener('click', () => {
-            userInteracted = true;
-        }, { once: true });
+        // Vérifier si l'utilisateur a déjà refusé récemment
+        const lastDeclined = localStorage.getItem('installDeclined');
+        const hoursSinceDeclined = lastDeclined ? 
+            (Date.now() - parseInt(lastDeclined)) / (1000 * 60 * 60) : 999;
         
-        setTimeout(() => {
-            if (deferredPrompt && !localStorage.getItem('installDeclined') && userInteracted) {
-                showInstallBanner();
-            }
-        }, 120000); // 2 minutes
+        // Montrer la bannière immédiatement si :
+        // - L'utilisateur n'a jamais refusé
+        // - Ou il a refusé il y a plus de 24 heures
+        if (!lastDeclined || hoursSinceDeclined > 24) {
+            // Attendre 2 secondes pour que la page soit bien chargée
+            setTimeout(() => {
+                if (deferredPrompt) {
+                    showInstallBanner();
+                }
+            }, 2000);
+        }
     });
     
     // Gestionnaire d'installation
     window.installApp = async () => {
         if (!deferredPrompt) {
-            alert('L\'application est déjà installée ou votre navigateur ne supporte pas l\'installation.');
+            // Si pas de prompt, essayer de montrer des instructions personnalisées
+            showManualInstallInstructions();
             return;
         }
         
@@ -1245,7 +1250,10 @@ function initPWA() {
             }
             // Montrer un message de succès
             showSuccessMessage('Application installée avec succès ! 🎉');
+            // Marquer comme installée
+            localStorage.setItem('pwaInstalled', 'true');
         } else {
+            // Enregistrer le refus avec timestamp
             localStorage.setItem('installDeclined', Date.now());
         }
         
@@ -1260,11 +1268,13 @@ function initPWA() {
         if (installBtn) {
             installBtn.style.display = 'none';
         }
+        localStorage.setItem('pwaInstalled', 'true');
     });
     
     // Vérifier si on est en mode standalone
     if (isInstalled) {
         console.log('App lancée en mode standalone');
+        localStorage.setItem('pwaInstalled', 'true');
     }
 }
 
@@ -1303,84 +1313,155 @@ function showInstallBanner() {
     banner.innerHTML = `
         <div style="
             position: fixed;
-            bottom: 80px;
-            left: 1rem;
-            right: 1rem;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
-            padding: 1.25rem;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+            padding: 1.5rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(37, 99, 235, 0.4);
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 1.25rem;
             z-index: 1000;
-            animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-            max-width: 500px;
-            margin: 0 auto;
+            animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            max-width: min(calc(100vw - 2rem), 500px);
+            width: 100%;
         ">
             <div style="
                 background: rgba(255, 255, 255, 0.2);
-                border-radius: 12px;
-                padding: 0.75rem;
+                border-radius: 16px;
+                padding: 1rem;
                 backdrop-filter: blur(10px);
+                border: 2px solid rgba(255, 255, 255, 0.3);
             ">
-                <span class="material-icons" style="font-size: 2rem; display: block;">install_mobile</span>
+                <span class="material-icons" style="font-size: 2.5rem; display: block;">install_mobile</span>
             </div>
             <div style="flex: 1;">
-                <strong style="display: block; margin-bottom: 0.25rem; font-size: 1.125rem;">Installer l'application</strong>
-                <span style="font-size: 0.875rem; opacity: 0.95;">Accédez rapidement à vos dépenses depuis votre écran d'accueil</span>
+                <strong style="display: block; margin-bottom: 0.375rem; font-size: 1.25rem;">Installer l'application</strong>
+                <span style="font-size: 0.9375rem; opacity: 0.95; line-height: 1.4;">Ajoutez l'app à votre écran d'accueil pour un accès rapide et hors ligne ⚡</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: stretch; min-width: 100px;">
                 <button onclick="installApp()" style="
                     background: white;
                     color: #2563eb;
                     border: none;
-                    padding: 0.625rem 1.25rem;
-                    border-radius: 10px;
-                    font-weight: 600;
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 12px;
+                    font-weight: 700;
                     cursor: pointer;
-                    font-size: 0.9375rem;
-                    transition: transform 0.2s;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Installer</button>
+                    font-size: 1rem;
+                    transition: all 0.2s;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                    white-space: nowrap;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.15)'" 
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'">Installer</button>
                 <button onclick="dismissInstallBanner()" style="
                     background: transparent;
-                    color: white;
-                    border: 1px solid rgba(255,255,255,0.3);
-                    padding: 0.375rem 0.75rem;
-                    border-radius: 8px;
+                    color: rgba(255,255,255,0.9);
+                    border: none;
+                    padding: 0.5rem;
                     cursor: pointer;
-                    font-size: 0.8125rem;
+                    font-size: 0.875rem;
                     transition: opacity 0.2s;
-                " onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">Plus tard</button>
+                    text-decoration: underline;
+                " onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">Non merci</button>
             </div>
         </div>
     `;
     
     document.body.appendChild(banner);
-    
-    // Auto-hide après 10 secondes
-    setTimeout(() => {
-        if (document.getElementById('installBanner')) {
-            hideInstallBanner();
-        }
-    }, 10000);
 }
 
-// Fonction pour masquer la bannière en gardant la possibilité de la réafficher
+// Fonction pour masquer la bannière avec possibilité de la réafficher plus tard
 function dismissInstallBanner() {
     hideInstallBanner();
-    // Stocker l'heure du refus pour ne pas re-montrer trop vite
-    sessionStorage.setItem('bannerDismissed', Date.now());
+    // Enregistrer un refus "léger" (24h avant de re-proposer)
+    localStorage.setItem('installDeclined', Date.now());
 }
 
 function hideInstallBanner() {
     const banner = document.getElementById('installBanner');
     if (banner) {
-        banner.style.animation = 'slideDown 0.3s ease-in';
-        setTimeout(() => banner.remove(), 300);
+        banner.style.animation = 'bounceOut 0.4s ease-in';
+        setTimeout(() => banner.remove(), 400);
     }
+}
+
+// Instructions manuelles pour les navigateurs non supportés
+function showManualInstallInstructions() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    let instructions = '';
+    
+    if (isIOS) {
+        instructions = `
+            <h3>📱 Installation sur iOS</h3>
+            <ol style="text-align: left; margin: 1rem 0;">
+                <li>Appuyez sur le bouton <strong>Partager</strong> <span style="font-size: 1.2rem;">⬆️</span></li>
+                <li>Faites défiler et appuyez sur <strong>"Sur l'écran d'accueil"</strong></li>
+                <li>Appuyez sur <strong>"Ajouter"</strong></li>
+            </ol>
+        `;
+    } else if (isAndroid) {
+        instructions = `
+            <h3>📱 Installation sur Android</h3>
+            <p>Essayez d'utiliser Chrome ou Edge pour installer cette application.</p>
+            <ol style="text-align: left; margin: 1rem 0;">
+                <li>Ouvrez le menu du navigateur (3 points)</li>
+                <li>Appuyez sur <strong>"Installer l'application"</strong></li>
+            </ol>
+        `;
+    } else {
+        instructions = `
+            <h3>💻 Installation sur ordinateur</h3>
+            <p>Cette application peut être installée depuis Chrome, Edge ou Brave.</p>
+            <p>Cherchez l'icône d'installation dans la barre d'adresse.</p>
+        `;
+    }
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 1rem;
+        " onclick="if(event.target === this) this.remove()">
+            <div style="
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                padding: 2rem;
+                border-radius: 20px;
+                max-width: 400px;
+                text-align: center;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            ">
+                ${instructions}
+                <button onclick="this.closest('div').parentElement.remove()" style="
+                    margin-top: 1rem;
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    padding: 0.75rem 2rem;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    cursor: pointer;
+                ">Compris</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
 }
 
 // Message de succès
@@ -1395,17 +1476,18 @@ function showSuccessMessage(message) {
         color: white;
         padding: 1rem 2rem;
         border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+        box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
         z-index: 10000;
-        animation: slideDown 0.5s ease-out;
+        animation: slideInDown 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         font-weight: 600;
+        font-size: 1.125rem;
     `;
     toast.textContent = message;
     document.body.appendChild(toast);
     
     setTimeout(() => {
-        toast.style.animation = 'slideUp 0.3s ease-in';
-        setTimeout(() => toast.remove(), 300);
+        toast.style.animation = 'slideOutUp 0.4s ease-in';
+        setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
 </script>
