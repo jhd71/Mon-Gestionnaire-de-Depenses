@@ -1164,7 +1164,7 @@
         openModal('statsModal');
     }
 
-    // PWA et installation améliorée
+// PWA et installation améliorée
 function initPWA() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -1194,21 +1194,36 @@ function initPWA() {
     let deferredPrompt;
     const installBtn = document.getElementById('installAppBtn');
     
+    // Vérifier si l'app n'est pas déjà installée
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || 
+                       window.navigator.standalone || 
+                       document.referrer.includes('android-app://');
+    
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
+        console.log('Installation disponible');
         
         // Afficher le bouton d'installation dans les paramètres
         if (installBtn) {
             installBtn.style.display = 'flex';
         }
         
-        // Afficher une bannière d'installation après 30 secondes
+        // Ajouter un bouton d'installation dans le header
+        addInstallButtonToHeader();
+        
+        // Afficher une bannière d'installation après 2 minutes (au lieu de 30 secondes)
+        // Seulement si l'utilisateur n'a pas déjà refusé et a fait au moins une action
+        let userInteracted = false;
+        document.addEventListener('click', () => {
+            userInteracted = true;
+        }, { once: true });
+        
         setTimeout(() => {
-            if (deferredPrompt && !localStorage.getItem('installDeclined')) {
+            if (deferredPrompt && !localStorage.getItem('installDeclined') && userInteracted) {
                 showInstallBanner();
             }
-        }, 30000);
+        }, 120000); // 2 minutes
     });
     
     // Gestionnaire d'installation
@@ -1218,17 +1233,20 @@ function initPWA() {
             return;
         }
         
+        hideInstallBanner();
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         
         if (outcome === 'accepted') {
             console.log('Installation acceptée');
-            hideInstallBanner();
+            removeInstallButton();
             if (installBtn) {
                 installBtn.style.display = 'none';
             }
+            // Montrer un message de succès
+            showSuccessMessage('Application installée avec succès ! 🎉');
         } else {
-            localStorage.setItem('installDeclined', 'true');
+            localStorage.setItem('installDeclined', Date.now());
         }
         
         deferredPrompt = null;
@@ -1238,18 +1256,44 @@ function initPWA() {
     window.addEventListener('appinstalled', () => {
         console.log('PWA installée avec succès');
         hideInstallBanner();
+        removeInstallButton();
         if (installBtn) {
             installBtn.style.display = 'none';
         }
     });
     
     // Vérifier si on est en mode standalone
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (isInstalled) {
         console.log('App lancée en mode standalone');
     }
 }
 
-// Bannière d'installation
+// Ajouter un bouton d'installation dans le header
+function addInstallButtonToHeader() {
+    // Vérifier si le bouton existe déjà
+    if (document.getElementById('headerInstallBtn')) return;
+    
+    const headerButtons = document.querySelector('.header-buttons');
+    if (!headerButtons) return;
+    
+    const installButton = document.createElement('button');
+    installButton.id = 'headerInstallBtn';
+    installButton.className = 'btn-icon install-pulse';
+    installButton.onclick = installApp;
+    installButton.title = 'Installer l\'application';
+    installButton.innerHTML = '<span class="material-icons">install_mobile</span>';
+    
+    // Ajouter le bouton au début des boutons du header
+    headerButtons.insertBefore(installButton, headerButtons.firstChild);
+}
+
+// Retirer le bouton d'installation
+function removeInstallButton() {
+    const btn = document.getElementById('headerInstallBtn');
+    if (btn) btn.remove();
+}
+
+// Bannière d'installation améliorée
 function showInstallBanner() {
     const existingBanner = document.getElementById('installBanner');
     if (existingBanner) return;
@@ -1262,50 +1306,107 @@ function showInstallBanner() {
             bottom: 80px;
             left: 1rem;
             right: 1rem;
-            background: var(--primary-gradient);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
-            padding: 1rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            padding: 1.25rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
             display: flex;
             align-items: center;
             gap: 1rem;
             z-index: 1000;
-            animation: slideUp 0.3s ease-out;
+            animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-width: 500px;
+            margin: 0 auto;
         ">
-            <span class="material-icons" style="font-size: 2rem;">install_mobile</span>
-            <div style="flex: 1;">
-                <strong style="display: block; margin-bottom: 0.25rem;">Installer l'application</strong>
-                <span style="font-size: 0.875rem; opacity: 0.9;">Accédez rapidement à vos dépenses depuis votre écran d'accueil</span>
+            <div style="
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 12px;
+                padding: 0.75rem;
+                backdrop-filter: blur(10px);
+            ">
+                <span class="material-icons" style="font-size: 2rem; display: block;">install_mobile</span>
             </div>
-            <button onclick="installApp()" style="
-                background: white;
-                color: var(--primary);
-                border: none;
-                padding: 0.5rem 1rem;
-                border-radius: 8px;
-                font-weight: 600;
-                cursor: pointer;
-            ">Installer</button>
-            <button onclick="hideInstallBanner()" style="
-                background: transparent;
-                color: white;
-                border: none;
-                padding: 0.5rem;
-                cursor: pointer;
-                font-size: 1.5rem;
-            ">×</button>
+            <div style="flex: 1;">
+                <strong style="display: block; margin-bottom: 0.25rem; font-size: 1.125rem;">Installer l'application</strong>
+                <span style="font-size: 0.875rem; opacity: 0.95;">Accédez rapidement à vos dépenses depuis votre écran d'accueil</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <button onclick="installApp()" style="
+                    background: white;
+                    color: #2563eb;
+                    border: none;
+                    padding: 0.625rem 1.25rem;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    font-size: 0.9375rem;
+                    transition: transform 0.2s;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Installer</button>
+                <button onclick="dismissInstallBanner()" style="
+                    background: transparent;
+                    color: white;
+                    border: 1px solid rgba(255,255,255,0.3);
+                    padding: 0.375rem 0.75rem;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 0.8125rem;
+                    transition: opacity 0.2s;
+                " onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">Plus tard</button>
+            </div>
         </div>
     `;
     
     document.body.appendChild(banner);
+    
+    // Auto-hide après 10 secondes
+    setTimeout(() => {
+        if (document.getElementById('installBanner')) {
+            hideInstallBanner();
+        }
+    }, 10000);
+}
+
+// Fonction pour masquer la bannière en gardant la possibilité de la réafficher
+function dismissInstallBanner() {
+    hideInstallBanner();
+    // Stocker l'heure du refus pour ne pas re-montrer trop vite
+    sessionStorage.setItem('bannerDismissed', Date.now());
 }
 
 function hideInstallBanner() {
     const banner = document.getElementById('installBanner');
     if (banner) {
-        banner.remove();
+        banner.style.animation = 'slideDown 0.3s ease-in';
+        setTimeout(() => banner.remove(), 300);
     }
+}
+
+// Message de succès
+function showSuccessMessage(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+        z-index: 10000;
+        animation: slideDown 0.5s ease-out;
+        font-weight: 600;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideUp 0.3s ease-in';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 </script>
 	<!-- Popup de donation -->

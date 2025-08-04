@@ -1134,13 +1134,35 @@ body {
     background: var(--text-secondary);
 }
 
-/* Animation pour la bannière d'installation */
-@keyframes slideUp {
+/* Bouton d'installation avec animation pulse */
+.install-pulse {
+    animation: pulse 2s infinite;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+}
+
+.install-pulse:hover {
+    animation: none;
+}
+
+/* Animation slide down */
+@keyframes slideDown {
     from {
-        transform: translateY(100%);
+        transform: translateY(-100%);
         opacity: 0;
     }
     to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Animation plus fluide pour slideUp */
+@keyframes slideUp {
+    0% {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    100% {
         transform: translateY(0);
         opacity: 1;
     }
