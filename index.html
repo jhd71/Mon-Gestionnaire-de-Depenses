@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<script>
+        // Appliquer le thème immédiatement pour éviter le flash
+        (function() {
+            const savedTheme = localStorage.getItem('preferredTheme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.body?.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gestionnaire de Dépenses</title>
@@ -285,12 +293,14 @@
 
     // Initialisation
     document.addEventListener('DOMContentLoaded', () => {
-        // Forcer le mode sombre au démarrage
-        document.body.setAttribute('data-theme', 'dark');
-        loadData();
-        initPWA();
-        renderApp();
-        initDonation();
+    // Appliquer le thème sauvegardé immédiatement
+    const preferredTheme = localStorage.getItem('preferredTheme') || 'dark';
+    document.body.setAttribute('data-theme', preferredTheme);
+    
+    loadData();
+    initPWA();
+    renderApp();
+    initDonation();
         
         // Masquer le FAB au démarrage si on est sur le tableau de bord
         if (appData.currentTab === 'dashboard') {
@@ -319,18 +329,22 @@
 
     // Fonctions de gestion des données
     function loadData() {
-        const saved = localStorage.getItem('expenseTrackerData');
-        if (saved) {
-            appData = JSON.parse(saved);
-            // Forcer le mode sombre
-            appData.theme = 'dark';
-            document.body.setAttribute('data-theme', 'dark');
-        } else {
-            // Si pas de données sauvegardées, initialiser en mode sombre
-            appData.theme = 'dark';
-            document.body.setAttribute('data-theme', 'dark');
-        }
+    const saved = localStorage.getItem('expenseTrackerData');
+    if (saved) {
+        appData = JSON.parse(saved);
     }
+    
+    // Charger le thème préféré de l'utilisateur
+    const preferredTheme = localStorage.getItem('preferredTheme');
+    if (preferredTheme) {
+        appData.theme = preferredTheme;
+        document.body.setAttribute('data-theme', preferredTheme);
+    } else {
+        // Si pas de préférence sauvegardée, utiliser le mode sombre par défaut
+        appData.theme = 'dark';
+        document.body.setAttribute('data-theme', 'dark');
+    }
+}
 
     function saveData() {
         localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
@@ -945,13 +959,16 @@
     document.addEventListener('keydown', handleCalculatorKeyboard);
 
     // Thème
-    function toggleTheme() {
-        const currentTheme = document.body.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        document.body.setAttribute('data-theme', newTheme);
-        appData.theme = newTheme;
-        saveData();
-    }
+function toggleTheme() {
+    const currentTheme = document.body.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', newTheme);
+    appData.theme = newTheme;
+    
+    // Sauvegarder le choix du thème
+    localStorage.setItem('preferredTheme', newTheme);
+    saveData();
+}
 
     // Paramètres
     function openSettings() {

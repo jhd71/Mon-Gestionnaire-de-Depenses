@@ -187,7 +187,7 @@ body {
     white-space: nowrap;
     border-radius: var(--radius);
     transition: all var(--transition-fast);
-    font-size: 0.875rem;
+    font-size: 1rem; /* Augmenté pour une meilleure lisibilité */
     font-weight: 600;
     position: relative;
     overflow: hidden;
@@ -208,7 +208,7 @@ body {
 }
 
 .tab.active {
-    color: #ff0000;
+    color: var(--primary);
     background: rgba(59, 130, 246, 0.1);
 }
 
@@ -696,15 +696,16 @@ body {
 }
 
 .modal-content {
-    background-color: var(--bg-primary);
-    border-radius: 12px;
-    padding: 1.5rem;
-    max-width: 400px;
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    max-width: 450px;
     width: 100%;
-    max-height: 90vh; /* Hauteur maximale */
-    overflow-y: auto; /* Scroll si le contenu dépasse */
-    box-shadow: 0 10px 25px var(--shadow);
-    position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border);
+    animation: modalSlideIn var(--transition-base);
 }
 
 @keyframes modalSlideIn {
@@ -1030,47 +1031,19 @@ body {
         padding: 1.5rem;
         border-radius: var(--radius-lg);
     }
-}
-
-/* Amélioration du scroll des tabs sur mobile */
-@media (max-width: 768px) {
-    .tabs {
+     
+	 .tabs {
         padding: 0.5rem 0.25rem;
-        /* Indicateur visuel de scroll possible */
-        position: relative;
-    }
-    
-    /* Ombre pour indiquer qu'il y a plus de contenu */
-    .tabs::after {
-        content: '';
-        position: absolute;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        width: 30px;
-        background: linear-gradient(to right, transparent, var(--bg-secondary));
-        pointer-events: none;
-        opacity: 0.8;
     }
     
     .tab {
-        padding: 0.875rem 1.5rem;
-        font-size: 0.9375rem;
+        font-size: 1.125rem; /* 18px sur mobile */
+        padding: 1rem 1.25rem;
+        font-weight: 600;
     }
     
-    /* Afficher une scrollbar fine sur mobile */
-    .tabs::-webkit-scrollbar {
-        display: block;
-        height: 4px;
-    }
-    
-    .tabs::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    
-    .tabs::-webkit-scrollbar-thumb {
-        background: var(--primary);
-        border-radius: 2px;
+    .add-tab {
+        font-size: 1.5rem; /* Bouton + plus grand aussi */
     }
 }
 
@@ -1079,6 +1052,16 @@ body {
         padding: 0;
     }
     
+	.header h1 {
+        font-size: 1.125rem;
+    }
+	
+	.tab {
+        font-size: 1.125rem; /* Plus grand sur mobile */
+        padding: 1.25rem 1.5rem;
+        font-weight: 700;
+    }
+	
     .modal-content {
         max-width: 100%;
         width: 100%;
@@ -1091,12 +1074,14 @@ body {
     
     .modal-body {
         flex: 1;
+        overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 2rem;
     }
     
     .modal-header {
         position: sticky;
+        top: 0;
         background-color: var(--bg-secondary);
         z-index: 10;
         padding: 1.5rem 1.5rem 1rem;
@@ -1105,6 +1090,8 @@ body {
     }
     
     .modal-footer {
+        position: sticky;
+        bottom: 0;
         background-color: var(--bg-secondary);
         padding: 1rem 1.5rem 1.5rem;
         margin: 1rem -1.5rem -1.5rem;
