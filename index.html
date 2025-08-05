@@ -2,13 +2,13 @@
 <html lang="fr">
 <head>
 <script>
-        // Appliquer le thème immédiatement pour éviter le flash
-        (function() {
-            const savedTheme = localStorage.getItem('preferredTheme') || 'dark';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            document.body?.setAttribute('data-theme', savedTheme);
-        })();
-    </script>
+    // Appliquer le thème immédiatement pour éviter le flash
+    (function() {
+        const savedTheme = localStorage.getItem('preferredTheme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.body?.setAttribute('data-theme', savedTheme);
+    })();
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gestionnaire de Dépenses</title>
@@ -962,6 +962,9 @@
 function toggleTheme() {
     const currentTheme = document.body.getAttribute('data-theme');
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    console.log('Toggle theme:', currentTheme, '->', newTheme); // Debug
+    
     document.body.setAttribute('data-theme', newTheme);
     appData.theme = newTheme;
     
@@ -996,20 +999,23 @@ function toggleTheme() {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    try {
-                        const data = JSON.parse(event.target.result);
-                        appData = data;
-                        // Forcer le mode sombre après import
-                        appData.theme = 'dark';
-                        document.body.setAttribute('data-theme', 'dark');
-                        saveData();
-                        renderApp();
-                        closeModal('settingsModal');
-                        alert('Données importées avec succès !');
-                    } catch (error) {
-                        alert('Erreur lors de l\'importation des données');
-                    }
-                };
+    try {
+        const data = JSON.parse(event.target.result);
+        appData = data;
+        
+        // Conserver le thème préféré de l'utilisateur
+        const preferredTheme = localStorage.getItem('preferredTheme') || 'dark';
+        appData.theme = preferredTheme;
+        document.body.setAttribute('data-theme', preferredTheme);
+        
+        saveData();
+        renderApp();
+        closeModal('settingsModal');
+        alert('Données importées avec succès !');
+    } catch (error) {
+        alert('Erreur lors de l\'importation des données');
+    }
+};
                 reader.readAsText(file);
             }
         };
@@ -1018,25 +1024,28 @@ function toggleTheme() {
 
     function confirmReset() {
         confirmCallback = () => {
-            if (confirm('Cette action supprimera TOUTES les données. Êtes-vous vraiment sûr ?')) {
-                appData = {
-                    users: {
-                        'commun': {
-                            name: 'Commun',
-                            incomes: [],
-                            expenses: []
-                        }
-                    },
-                    commonExpenses: [],
-                    currentTab: 'dashboard',
-                    theme: 'dark'
-                };
-                saveData();
-                renderApp();
-                location.reload(); // Recharger la page pour réinitialiser complètement
-                closeModal('settingsModal');
-            }
+    if (confirm('Cette action supprimera TOUTES les données. Êtes-vous vraiment sûr ?')) {
+        // Conserver le thème préféré
+        const preferredTheme = localStorage.getItem('preferredTheme') || 'dark';
+        
+        appData = {
+            users: {
+                'commun': {
+                    name: 'Commun',
+                    incomes: [],
+                    expenses: []
+                }
+            },
+            commonExpenses: [],
+            currentTab: 'dashboard',
+            theme: preferredTheme // Utiliser le thème préféré
         };
+        saveData();
+        renderApp();
+        location.reload(); // Recharger la page pour réinitialiser complètement
+        closeModal('settingsModal');
+    }
+};
         showConfirm('Voulez-vous vraiment réinitialiser toutes les données ?');
     }
 
