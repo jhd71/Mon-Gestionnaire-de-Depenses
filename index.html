@@ -293,11 +293,25 @@
 
     // Initialisation
     document.addEventListener('DOMContentLoaded', () => {
-    // Appliquer le thème sauvegardé immédiatement
-    const preferredTheme = localStorage.getItem('preferredTheme') || 'dark';
+    // Appliquer le thème sauvegardé ou celui déjà défini par le script du head
+    const preferredTheme = localStorage.getItem('preferredTheme') || 
+                          document.body.getAttribute('data-theme') || 
+                          'dark';
+    
     document.body.setAttribute('data-theme', preferredTheme);
+    document.documentElement.setAttribute('data-theme', preferredTheme);
+    
+    // S'assurer que appData sera synchronisé après le chargement
+    loadData();
+    
+    // Forcer la synchronisation du thème après le chargement des données
+    if (appData.theme !== preferredTheme) {
+        appData.theme = preferredTheme;
+        saveData();
+    }
     
     loadData();
+	syncTheme();
     initPWA();
     renderApp();
     initDonation();
@@ -340,9 +354,10 @@
         appData.theme = preferredTheme;
         document.body.setAttribute('data-theme', preferredTheme);
     } else {
-        // Si pas de préférence sauvegardée, utiliser le mode sombre par défaut
-        appData.theme = 'dark';
-        document.body.setAttribute('data-theme', 'dark');
+        // Si pas de préférence sauvegardée, utiliser le thème actuel du body ou dark par défaut
+        const currentBodyTheme = document.body.getAttribute('data-theme') || 'dark';
+        appData.theme = currentBodyTheme;
+        localStorage.setItem('preferredTheme', currentBodyTheme);
     }
 }
 
@@ -960,17 +975,35 @@
 
     // Thème
 function toggleTheme() {
-    const currentTheme = document.body.getAttribute('data-theme');
+    // Obtenir le thème actuel du body (source de vérité)
+    const currentTheme = document.body.getAttribute('data-theme') || 'dark';
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     
     console.log('Toggle theme:', currentTheme, '->', newTheme); // Debug
     
+    // Appliquer le nouveau thème
     document.body.setAttribute('data-theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
     appData.theme = newTheme;
     
     // Sauvegarder le choix du thème
     localStorage.setItem('preferredTheme', newTheme);
     saveData();
+}
+
+// Fonction pour synchroniser le thème
+function syncTheme() {
+    const bodyTheme = document.body.getAttribute('data-theme');
+    const savedTheme = localStorage.getItem('preferredTheme');
+    const appTheme = appData.theme;
+    
+    // Si tous ne sont pas synchronisés, utiliser la préférence sauvegardée
+    if (savedTheme && (bodyTheme !== savedTheme || appTheme !== savedTheme)) {
+        document.body.setAttribute('data-theme', savedTheme);
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        appData.theme = savedTheme;
+        console.log('Theme synchronized to:', savedTheme);
+    }
 }
 
     // Paramètres
