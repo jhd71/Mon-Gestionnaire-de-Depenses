@@ -1192,23 +1192,23 @@ function syncTheme() {
             </div>
             
             <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
-    <h3 style="margin-bottom: 1rem;">Par utilisateur</h3>
-    <div style="display: grid; gap: 0.5rem;">
-        ${userStats.map(user => `
-            <div style="padding: 0.75rem; background-color: var(--bg-primary); border-radius: 6px;">
-                <strong style="display: block; margin-bottom: 0.375rem;">${user.name}</strong>
-                <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.375rem 1rem; align-items: center; font-size: 0.875rem;">
-                    <span>Revenus :</span>
-                    <span style="color: var(--success); text-align: right;">+${user.revenue.toFixed(2)}€</span>
-                    <span>Dépenses :</span>
-                    <span style="color: var(--danger); text-align: right;">-${user.expenses.toFixed(2)}€</span>
-                    <span style="border-top: 1px solid var(--border); padding-top: 0.25rem; grid-column: 1;">Solde :</span>
-                    <span style="color: var(--primary); font-weight: bold; text-align: right; border-top: 1px solid var(--border); padding-top: 0.25rem;">${user.balance.toFixed(2)}€</span>
+                <h3 style="margin-bottom: 1rem;">Par utilisateur</h3>
+                <div style="display: grid; gap: 0.75rem;">
+                    ${userStats.map(user => `
+                        <div style="padding: 0.5rem; background-color: var(--bg-primary); border-radius: 6px;">
+                            <strong>${user.name}</strong>
+                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.25rem; margin-top: 0.5rem; font-size: 0.875rem;">
+                                <span>Revenus :</span>
+                                <span style="color: var(--success);">+${user.revenue.toFixed(2)}€</span>
+                                <span>Dépenses :</span>
+                                <span style="color: var(--danger);">-${user.expenses.toFixed(2)}€</span>
+                                <span>Solde :</span>
+                                <span style="color: var(--primary); font-weight: bold;">${user.balance.toFixed(2)}€</span>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
-        `).join('')}
-    </div>
-</div>
             
             <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
                 <h3 style="margin-bottom: 1rem;">Informations</h3>
