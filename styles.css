@@ -696,15 +696,15 @@ body {
 }
 
 .modal-content {
-    background-color: var(--bg-secondary);
-    border-radius: var(--radius-xl);
-    padding: 2rem;
-    max-width: 450px;
+    background-color: var(--bg-primary);
+    border-radius: 12px;
+    padding: 1.5rem;
+    max-width: 400px;
     width: 100%;
-    max-height: 90vh;
-    box-shadow: var(--shadow-xl);
-    border: 1px solid var(--border);
-    animation: modalSlideIn var(--transition-base);
+    max-height: 90vh; /* Hauteur maximale */
+    overflow-y: auto; /* Scroll si le contenu dépasse */
+    box-shadow: 0 10px 25px var(--shadow);
+    position: relative;
 }
 
 @keyframes modalSlideIn {
