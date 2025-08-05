@@ -1097,7 +1097,6 @@ body {
     
     .modal-header {
         position: sticky;
-        top: 0;
         background-color: var(--bg-secondary);
         z-index: 10;
         padding: 1.5rem 1.5rem 1rem;
@@ -1106,8 +1105,6 @@ body {
     }
     
     .modal-footer {
-        position: sticky;
-        bottom: 0;
         background-color: var(--bg-secondary);
         padding: 1rem 1.5rem 1.5rem;
         margin: 1rem -1.5rem -1.5rem;
