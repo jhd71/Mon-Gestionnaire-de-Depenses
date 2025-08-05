@@ -162,12 +162,16 @@ body {
     background-color: var(--bg-secondary);
     display: flex;
     overflow-x: auto;
+    overflow-y: hidden;
     box-shadow: var(--shadow);
-    scrollbar-width: none;
+    scrollbar-width: thin;
     -ms-overflow-style: none;
     padding: 0.25rem;
     gap: 0.25rem;
     border-bottom: 1px solid var(--border);
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling sur iOS */
+    position: relative;
 }
 
 .tabs::-webkit-scrollbar {
@@ -187,6 +191,8 @@ body {
     font-weight: 600;
     position: relative;
     overflow: hidden;
+    flex-shrink: 0; /* Empêche les tabs de se rétrécir */
+    min-width: fit-content; /* Assure une largeur minimale */
 }
 
 .tab::before {
@@ -226,6 +232,7 @@ body {
     border-radius: var(--radius);
     transition: all var(--transition-fast);
     min-width: 44px;
+    flex-shrink: 0; /* Empêche le bouton + de se rétrécir */
 }
 
 .add-tab:hover {
@@ -1023,6 +1030,48 @@ body {
     .modal-content {
         padding: 1.5rem;
         border-radius: var(--radius-lg);
+    }
+}
+
+/* Amélioration du scroll des tabs sur mobile */
+@media (max-width: 768px) {
+    .tabs {
+        padding: 0.5rem 0.25rem;
+        /* Indicateur visuel de scroll possible */
+        position: relative;
+    }
+    
+    /* Ombre pour indiquer qu'il y a plus de contenu */
+    .tabs::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 30px;
+        background: linear-gradient(to right, transparent, var(--bg-secondary));
+        pointer-events: none;
+        opacity: 0.8;
+    }
+    
+    .tab {
+        padding: 0.875rem 1.25rem;
+        font-size: 0.9375rem;
+    }
+    
+    /* Afficher une scrollbar fine sur mobile */
+    .tabs::-webkit-scrollbar {
+        display: block;
+        height: 4px;
+    }
+    
+    .tabs::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .tabs::-webkit-scrollbar-thumb {
+        background: var(--primary);
+        border-radius: 2px;
     }
 }
 
