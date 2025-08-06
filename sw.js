@@ -14,7 +14,6 @@ const urlsToCache = [
    // Scripts JavaScript
   '/js/pdf-export.js',
   '/js/ocr-scanner.js',
-  '/js/recurring.js',
   '/js/security.js',
   'https://fonts.googleapis.com/icon?family=Material+Icons'
 ];
