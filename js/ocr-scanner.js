@@ -1,62 +1,78 @@
 // ocr-scanner.js - Scanner de tickets de caisse avec OCR
 
 // Fonction principale pour scanner un ticket
-window.scanReceiptOCR = async function() {
-    // Créer un input file temporaire
+window.scanReceiptOCR = async function () {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.capture = 'environment'; // Utiliser la caméra arrière sur mobile
-    
+    input.capture = 'environment';
+
     input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
-        // Afficher un loader
+
         showScanLoader();
-        
+
         try {
-            // Convertir l'image en base64
             const base64 = await fileToBase64(file);
-            
-            // Utiliser l'API OCR (Tesseract.js ou API externe)
-            const extractedData = await processReceiptOCR(base64);
-            
-            // Afficher le modal de confirmation
+            const resized = await resizeImage(base64, 800); // Compression avant OCR
+            const extractedData = await processReceiptOCR(resized);
             showReceiptConfirmation(extractedData);
-            
         } catch (error) {
-            console.error('Erreur OCR:', error);
-            alert('Impossible de lire le ticket. Veuillez réessayer ou saisir manuellement.');
+            console.error('Erreur OCR :', error);
+            alert("Échec de l'analyse du ticket. Essayez avec une photo plus claire.");
         } finally {
             hideScanLoader();
         }
     };
-    
-    input.click();
-}
 
-// Convertir fichier en base64
+    input.click();
+};
+
+// Convertir image en base64
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.readAsDataURL(file);
         reader.onload = () => resolve(reader.result);
         reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
     });
 }
 
+// Redimensionner l’image (important pour éviter les plantages)
+function resizeImage(base64, maxWidth = 800) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const scale = maxWidth / img.width;
+            canvas.width = maxWidth;
+            canvas.height = img.height * scale;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            resolve(canvas.toDataURL('image/jpeg', 0.7)); // 70% qualité
+        };
+        img.src = base64;
+    });
+}
+
+// Analyse OCR réelle
 async function processReceiptOCR(base64Image) {
     const result = await Tesseract.recognize(
         base64Image,
-        'fra',
+        'fra', // Tu peux tester 'eng' si les résultats sont mauvais
         {
             logger: m => console.log(m)
         }
     );
 
     const text = result.data.text;
-    console.log('Texte OCR détecté :', text);
+    console.log('--- TEXTE OCR DÉTECTÉ ---');
+    console.log(text);
+    console.log('--------------------------');
+
     return parseReceiptText(text);
 }
 
