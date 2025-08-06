@@ -17,7 +17,7 @@ window.addRecurringItem = function() {
                     <!-- Type -->
                     <div>
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Type</label>
-                        <select id="recurringType" class="input" onchange="updateRecurringForm()">
+                        <select id="recurringType" class="input" onchange="window.updateRecurringForm()">
                             <option value="expense">Dépense</option>
                             <option value="income">Revenu</option>
                         </select>
@@ -52,9 +52,12 @@ window.addRecurringItem = function() {
                     <div id="categoryDiv">
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Catégorie</label>
                         <select id="recurringCategory" class="input">
-                            ${window.appData.categories.map(cat => 
-                                `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
-                            ).join('')}
+                            ${window.appData && window.appData.categories ? 
+                                window.appData.categories.map(cat => 
+                                    `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
+                                ).join('') :
+                                '<option value="autre">📦 Autre</option>'
+                            }
                         </select>
                     </div>
                     
@@ -84,8 +87,8 @@ window.addRecurringItem = function() {
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-danger" onclick="closeModal('recurringModal')">Annuler</button>
-                <button class="btn" onclick="confirmAddRecurring()">
+                <button class="btn btn-danger" onclick="window.closeModal('recurringModal')">Annuler</button>
+                <button class="btn" onclick="window.confirmAddRecurring()">
                     <span class="material-icons">add</span>
                     Créer
                 </button>
@@ -98,7 +101,7 @@ window.addRecurringItem = function() {
 }
 
 // Mettre à jour le formulaire selon le type
-function updateRecurringForm() {
+window.updateRecurringForm = function() {
     const type = document.getElementById('recurringType').value;
     const categoryDiv = document.getElementById('categoryDiv');
     
@@ -132,26 +135,42 @@ window.confirmAddRecurring = function() {
         return;
     }
     
+    // S'assurer que les catégories existent
+    if (!window.appData.categories || window.appData.categories.length === 0) {
+        window.appData.categories = [
+            { id: 'alimentation', name: 'Alimentation', icon: '🛒', color: '#10b981' },
+            { id: 'transport', name: 'Transport', icon: '🚗', color: '#3b82f6' },
+            { id: 'logement', name: 'Logement', icon: '🏠', color: '#8b5cf6' },
+            { id: 'sante', name: 'Santé', icon: '💊', color: '#ef4444' },
+            { id: 'loisirs', name: 'Loisirs', icon: '🎮', color: '#f59e0b' },
+            { id: 'shopping', name: 'Shopping', icon: '🛍️', color: '#ec4899' },
+            { id: 'factures', name: 'Factures', icon: '📄', color: '#6366f1' },
+            { id: 'education', name: 'Éducation', icon: '📚', color: '#14b8a6' },
+            { id: 'restaurant', name: 'Restaurant', icon: '🍽️', color: '#f97316' },
+            { id: 'autre', name: 'Autre', icon: '📦', color: '#6b7280' }
+        ];
+    }
+    
     // Ajouter à la liste des récurrences
     if (!window.appData.recurringItems) {
         window.appData.recurringItems = [];
     }
     window.appData.recurringItems.push(recurring);
     
-    saveData();
-    closeModal('recurringModal');
+    window.saveData();
+    window.closeModal('recurringModal');
     
     // Vérifier si on doit ajouter immédiatement
-    checkAndAddRecurringItems();
+    window.checkAndAddRecurringItems();
     
-    showSuccessMessage('Transaction récurrente créée !');
+    window.showSuccessMessage('Transaction récurrente créée !');
     
     // Afficher la liste mise à jour
     window.showRecurringListModal();
 }
 
 // Vérifier et ajouter les transactions récurrentes échues
-function checkAndAddRecurringItems() {
+window.checkAndAddRecurringItems = function() {
     if (!window.appData.recurringItems) return;
     
     const today = new Date();
@@ -160,7 +179,7 @@ function checkAndAddRecurringItems() {
     window.appData.recurringItems.forEach(recurring => {
         if (!recurring.active || !recurring.autoAdd) return;
         
-        const nextDate = calculateNextDate(recurring);
+        const nextDate = window.calculateNextDate(recurring);
         
         if (nextDate <= today) {
             // Ajouter la transaction
@@ -190,12 +209,12 @@ function checkAndAddRecurringItems() {
         }
     });
     
-    saveData();
-    renderApp();
+    window.saveData();
+    window.renderApp();
 }
 
 // Calculer la prochaine date d'échéance
-function calculateNextDate(recurring) {
+window.calculateNextDate = function(recurring) {
     const startDate = new Date(recurring.startDate);
     const lastAdded = recurring.lastAdded ? new Date(recurring.lastAdded) : null;
     const baseDate = lastAdded || startDate;
@@ -225,6 +244,12 @@ function calculateNextDate(recurring) {
 
 // Afficher la liste des transactions récurrentes
 window.showRecurringListModal = function() {
+    // Fermer le modal existant s'il existe
+    const existingModal = document.getElementById('recurringListModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
     const modal = document.createElement('div');
     modal.className = 'modal active';
     modal.id = 'recurringListModal';
@@ -238,7 +263,7 @@ window.showRecurringListModal = function() {
                 Transactions récurrentes
             </div>
             <div class="modal-body">
-                <button class="btn" onclick="addRecurringItem()" style="margin-bottom: 1rem;">
+                <button class="btn" onclick="window.addRecurringItem()" style="margin-bottom: 1rem;">
                     <span class="material-icons">add</span>
                     Nouvelle transaction récurrente
                 </button>
@@ -248,8 +273,11 @@ window.showRecurringListModal = function() {
                     `<div class="items-list">
                         ${recurringItems.map(item => {
                             const user = window.appData.users[item.userId];
-                            const nextDate = calculateNextDate(item);
-                            const category = window.appData.categories.find(c => c.id === item.category);
+                            if (!user) return ''; // Si l'utilisateur n'existe plus
+                            
+                            const nextDate = window.calculateNextDate(item);
+                            const category = window.appData.categories ? 
+                                window.appData.categories.find(c => c.id === item.category) : null;
                             
                             return `
                                 <div class="item" style="padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 0.5rem;">
@@ -274,57 +302,58 @@ window.showRecurringListModal = function() {
                                             <span class="item-amount ${item.type}" style="font-size: 1.125rem;">
                                                 ${item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€
                                             </span>
-                                            <button class="btn btn-small btn-danger" onclick="deleteRecurring('${item.id}')">×</button>
+                                            <button class="btn btn-small btn-danger" onclick="window.deleteRecurring('${item.id}')">×</button>
                                         </div>
                                     </div>
                                     <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
-                                        <button class="btn btn-small" onclick="toggleRecurringActive('${item.id}')">
+                                        <button class="btn btn-small" onclick="window.toggleRecurringActive('${item.id}')">
                                             ${item.active ? 'Désactiver' : 'Activer'}
                                         </button>
                                         ${!item.autoAdd ? 
-                                            `<button class="btn btn-small" onclick="addRecurringNow('${item.id}')">
+                                            `<button class="btn btn-small" onclick="window.addRecurringNow('${item.id}')">
                                                 Ajouter maintenant
                                             </button>` : ''
                                         }
                                     </div>
                                 </div>
                             `;
-                        }).join('')}
+                        }).filter(html => html !== '').join('')}
                     </div>`
                 }
             </div>
             <div class="modal-footer">
-                <button class="btn" onclick="closeModal('recurringListModal')">Fermer</button>
+                <button class="btn" onclick="window.closeModal('recurringListModal')">Fermer</button>
             </div>
         </div>
     `;
     
     document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
 }
 
 // Supprimer une transaction récurrente
-function deleteRecurring(id) {
+window.deleteRecurring = function(id) {
     if (confirm('Supprimer cette transaction récurrente ?')) {
         window.appData.recurringItems = window.appData.recurringItems.filter(item => item.id !== id);
-        saveData();
-        closeModal('recurringListModal');
-        showRecurringList();
+        window.saveData();
+        window.closeModal('recurringListModal');
+        window.showRecurringListModal();
     }
 }
 
 // Activer/Désactiver une transaction récurrente
-function toggleRecurringActive(id) {
+window.toggleRecurringActive = function(id) {
     const item = window.appData.recurringItems.find(r => r.id === id);
     if (item) {
         item.active = !item.active;
-        saveData();
-        closeModal('recurringListModal');
-        showRecurringList();
+        window.saveData();
+        window.closeModal('recurringListModal');
+        window.showRecurringListModal();
     }
 }
 
 // Ajouter manuellement une transaction récurrente
-function addRecurringNow(id) {
+window.addRecurringNow = function(id) {
     const recurring = window.appData.recurringItems.find(r => r.id === id);
     if (!recurring) return;
     
@@ -348,18 +377,26 @@ function addRecurringNow(id) {
     }
     
     recurring.lastAdded = new Date().toISOString();
-    saveData();
-    renderApp();
+    window.saveData();
+    window.renderApp();
     
-    closeModal('recurringListModal');
-    showSuccessMessage('Transaction ajoutée !');
+    window.closeModal('recurringListModal');
+    window.showSuccessMessage('Transaction ajoutée !');
 }
 
 // Vérifier les récurrences au démarrage
 document.addEventListener('DOMContentLoaded', () => {
     // Attendre 2 secondes puis vérifier
-    setTimeout(checkAndAddRecurringItems, 2000);
+    setTimeout(() => {
+        if (typeof window.checkAndAddRecurringItems === 'function') {
+            window.checkAndAddRecurringItems();
+        }
+    }, 2000);
     
     // Vérifier toutes les heures
-    setInterval(checkAndAddRecurringItems, 60 * 60 * 1000);
+    setInterval(() => {
+        if (typeof window.checkAndAddRecurringItems === 'function') {
+            window.checkAndAddRecurringItems();
+        }
+    }, 60 * 60 * 1000);
 });

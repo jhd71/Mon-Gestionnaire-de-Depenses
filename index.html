@@ -328,6 +328,52 @@ window.appData = {
 
     // Initialisation
 document.addEventListener('DOMContentLoaded', () => {
+// Exposer les fonctions nécessaires aux modules externes
+window.closeModal = closeModal;
+window.openModal = openModal;
+window.saveData = saveData;
+window.renderApp = renderApp;
+window.showSuccessMessage = showSuccessMessage;
+
+// Exposer également les autres fonctions si nécessaire
+window.confirmAddTab = confirmAddTab;
+window.addIncome = addIncome;
+window.confirmAddIncome = confirmAddIncome;
+window.addExpense = addExpense;
+window.confirmAddExpense = confirmAddExpense;
+window.addCommonExpense = addCommonExpense;
+window.confirmAddCommonExpense = confirmAddCommonExpense;
+window.deleteUser = deleteUser;
+window.deleteItem = deleteItem;
+window.deleteCommonExpense = deleteCommonExpense;
+window.switchTab = switchTab;
+window.addNewTab = addNewTab;
+window.toggleFabMenu = toggleFabMenu;
+window.quickAddIncome = quickAddIncome;
+window.quickAddExpense = quickAddExpense;
+window.toggleCalculator = toggleCalculator;
+window.showStats = showStats;
+window.openSettings = openSettings;
+window.exportData = exportData;
+window.importData = importData;
+window.confirmReset = confirmReset;
+window.toggleTheme = toggleTheme;
+window.installApp = installApp;
+window.showDonationPopup = showDonationPopup;
+window.closeDonationPopup = closeDonationPopup;
+
+// Calculatrice
+window.appendToCalc = appendToCalc;
+window.clearCalc = clearCalc;
+window.deleteLastCalc = deleteLastCalc;
+window.calculateResult = calculateResult;
+window.updateCalcDisplay = updateCalcDisplay;
+
+// PIN Security
+window.addPinDigit = addPinDigit;
+window.clearPin = clearPin;
+window.submitPin = submitPin;
+window.togglePinSecurity = togglePinSecurity;
     // Appliquer le thème sauvegardé ou celui déjà défini par le script du head
     const preferredTheme = localStorage.getItem('preferredTheme') || 
                           document.body.getAttribute('data-theme') || 
