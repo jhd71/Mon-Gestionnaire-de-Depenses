@@ -20,11 +20,17 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="apple-touch-icon" href="./images/icon-192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="./images/icon-180.png">
-<link rel="icon" type="image/png" sizes="32x32" href="./images/icon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="./images/icon-16.png">
-<meta name="msapplication-TileColor" content="#2563eb">
-<meta name="msapplication-TileImage" content="./images/icon-144.png">
+	<link rel="apple-touch-icon" sizes="180x180" href="./images/icon-180.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./images/icon-32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./images/icon-16.png">
+	<meta name="msapplication-TileColor" content="#2563eb">
+	<meta name="msapplication-TileImage" content="./images/icon-144.png">
+	<!-- Ajoutez après les autres scripts -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+	<script src="js/ocr-scanner.js"></script>
+	<script src="js/pdf-export.js"></script>
+	<script src="js/security.js"></script>
+	<script src="js/recurring.js"></script>
 </head>
 <body>
     <div class="header">
@@ -144,19 +150,22 @@
     </div>
 
     <!-- Modal pour ajouter une dépense -->
-    <div class="modal" id="addExpenseModal">
-        <div class="modal-content">
-            <div class="modal-header">Ajouter une dépense</div>
-            <div class="modal-body">
-                <input type="text" class="input" id="expenseName" placeholder="Description" style="margin-bottom: 0.75rem;">
-                <input type="number" class="input" id="expenseAmount" placeholder="Montant" step="0.01">
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-danger" onclick="closeModal('addExpenseModal')">Annuler</button>
-                <button class="btn" onclick="confirmAddExpense()">Ajouter</button>
-            </div>
+<div class="modal" id="addExpenseModal">
+    <div class="modal-content">
+        <div class="modal-header">Ajouter une dépense</div>
+        <div class="modal-body">
+            <input type="text" class="input" id="expenseName" placeholder="Description" style="margin-bottom: 0.75rem;">
+            <input type="number" class="input" id="expenseAmount" placeholder="Montant" step="0.01" style="margin-bottom: 0.75rem;">
+            <select id="expenseCategory" class="input" style="margin-bottom: 0.75rem;">
+                <option value="">Choisir une catégorie...</option>
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" onclick="closeModal('addExpenseModal')">Annuler</button>
+            <button class="btn" onclick="confirmAddExpense()">Ajouter</button>
         </div>
     </div>
+</div>
 
     <!-- Modal pour ajouter une dépense commune -->
     <div class="modal" id="addCommonExpenseModal">
@@ -229,7 +238,26 @@
             <span class="material-icons">install_mobile</span>
             Installer l'application
         </button>
-        
+		<button class="btn" onclick="togglePinSecurity()">
+    <span class="material-icons">lock</span>
+    <span id="pinButtonText">Activer le code PIN</span>
+	</button>
+        <button class="btn" onclick="scanReceipt()">
+    <span class="material-icons">document_scanner</span>
+    Scanner un ticket
+	</button>
+	<button class="btn" onclick="exportToPDF()">
+    <span class="material-icons">picture_as_pdf</span>
+    Exporter en PDF
+	</button>
+	<button class="btn" onclick="showRecurringList()">
+    <span class="material-icons">repeat</span>
+    Transactions récurrentes
+	</button>
+	<button class="btn" onclick="togglePinSecurity()">
+    <span class="material-icons">lock</span>
+    ${appData.security?.pinEnabled ? 'Désactiver' : 'Activer'} le code PIN
+	</button>
         <button class="btn" onclick="exportData()">
             <span class="material-icons">download</span>
             Exporter les données
@@ -270,19 +298,36 @@
     </div>
 
     <script>
-    // État global de l'application
-    let appData = {
-        users: {
-            'commun': {
-                name: 'Commun',
-                incomes: [],
-                expenses: []
-            }
-        },
-        commonExpenses: [],
-        currentTab: 'dashboard',
-        theme: 'dark'
-    };
+    // État global de l'application avec catégories
+let appData = {
+    users: {
+        'commun': {
+            name: 'Commun',
+            incomes: [],
+            expenses: []
+        }
+    },
+    categories: [
+        { id: 'alimentation', name: 'Alimentation', icon: '🛒', color: '#10b981' },
+        { id: 'transport', name: 'Transport', icon: '🚗', color: '#3b82f6' },
+        { id: 'logement', name: 'Logement', icon: '🏠', color: '#8b5cf6' },
+        { id: 'sante', name: 'Santé', icon: '💊', color: '#ef4444' },
+        { id: 'loisirs', name: 'Loisirs', icon: '🎮', color: '#f59e0b' },
+        { id: 'shopping', name: 'Shopping', icon: '🛍️', color: '#ec4899' },
+        { id: 'factures', name: 'Factures', icon: '📄', color: '#6366f1' },
+        { id: 'education', name: 'Éducation', icon: '📚', color: '#14b8a6' },
+        { id: 'restaurant', name: 'Restaurant', icon: '🍽️', color: '#f97316' },
+        { id: 'autre', name: 'Autre', icon: '📦', color: '#6b7280' }
+    ],
+    commonExpenses: [],
+    currentTab: 'dashboard',
+    theme: 'dark',
+    recurringItems: [], // Pour les dépenses récurrentes
+    security: {
+        pinEnabled: false,
+        pin: null
+    }
+};
 
     // Variables globales
     let currentUser = '';
@@ -292,7 +337,7 @@
     let sessionStart = Date.now();
 
     // Initialisation
-    document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     // Appliquer le thème sauvegardé ou celui déjà défini par le script du head
     const preferredTheme = localStorage.getItem('preferredTheme') || 
                           document.body.getAttribute('data-theme') || 
@@ -310,16 +355,16 @@
         saveData();
     }
     
-    loadData();
-	syncTheme();
+    initSecurity();
+    syncTheme();
     initPWA();
     renderApp();
     initDonation();
-        
-        // Masquer le FAB au démarrage si on est sur le tableau de bord
-        if (appData.currentTab === 'dashboard') {
-            document.getElementById('fabButton').style.display = 'none';
-        }
+    
+    // Masquer le FAB au démarrage si on est sur le tableau de bord
+    if (appData.currentTab === 'dashboard') {
+        document.getElementById('fabButton').style.display = 'none';
+    }
         
         // Surcharge de exportData pour le tracking
         const originalExportData = exportData;
@@ -705,28 +750,57 @@
 
     // Gestion des dépenses
     function addExpense(userId) {
-        currentUser = userId;
-        document.getElementById('expenseName').value = '';
-        document.getElementById('expenseAmount').value = '';
-        openModal('addExpenseModal');
-    }
+    currentUser = userId;
+    document.getElementById('expenseName').value = '';
+    document.getElementById('expenseAmount').value = '';
+    
+    // Remplir le sélecteur de catégories
+    const categorySelect = document.getElementById('expenseCategory');
+    categorySelect.innerHTML = '<option value="">Choisir une catégorie...</option>' +
+        appData.categories.map(cat => 
+            `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
+        ).join('');
+    
+    openModal('addExpenseModal');
+}
 
     function confirmAddExpense() {
-        const name = document.getElementById('expenseName').value.trim();
-        const amount = parseFloat(document.getElementById('expenseAmount').value);
-        
-        if (name && amount > 0) {
-            appData.users[currentUser].expenses.push({
-                name: name,
-                amount: amount,
-                date: new Date().toISOString()
-            });
-            saveData();
-            renderApp();
-            closeModal('addExpenseModal');
-            trackUserAction();
-        }
+    const name = document.getElementById('expenseName').value.trim();
+    const amount = parseFloat(document.getElementById('expenseAmount').value);
+    const category = document.getElementById('expenseCategory').value;
+    
+    if (name && amount > 0) {
+        appData.users[currentUser].expenses.push({
+            name: name,
+            amount: amount,
+            category: category || 'autre',
+            date: new Date().toISOString()
+        });
+        saveData();
+        renderApp();
+        closeModal('addExpenseModal');
+        trackUserAction();
     }
+}
+
+// Fonction pour obtenir les statistiques par catégorie
+function getExpensesByCategory(userId) {
+    const expenses = userId === 'all' 
+        ? Object.values(appData.users).flatMap(user => user.expenses)
+        : appData.users[userId].expenses;
+    
+    const categoryTotals = {};
+    appData.categories.forEach(cat => {
+        categoryTotals[cat.id] = 0;
+    });
+    
+    expenses.forEach(expense => {
+        const category = expense.category || 'autre';
+        categoryTotals[category] = (categoryTotals[category] || 0) + expense.amount;
+    });
+    
+    return categoryTotals;
+}
 
     // Gestion des dépenses communes
     function addCommonExpense() {
@@ -1549,7 +1623,251 @@ function showSuccessMessage(message) {
         setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
+
+// ========== SYSTÈME DE SÉCURITÉ PIN ==========
+let currentPin = '';
+let isSettingPin = false;
+let pinAttempts = 0;
+const MAX_ATTEMPTS = 3;
+
+// Initialiser la sécurité au démarrage
+function initSecurity() {
+    if (appData.security && appData.security.pinEnabled && appData.security.pin) {
+        // Bloquer l'accès jusqu'à la saisie du PIN
+        showPinScreen();
+    }
+}
+
+// Afficher l'écran de PIN
+function showPinScreen() {
+    currentPin = '';
+    updatePinDisplay();
+    
+    const modal = document.getElementById('pinModal');
+    modal.classList.add('active');
+    modal.style.zIndex = '100000';
+    
+    document.getElementById('pinTitle').textContent = 'Entrez votre code PIN';
+    document.getElementById('pinError').style.display = 'none';
+    
+    // Bloquer toute l'interface
+    document.body.style.pointerEvents = 'none';
+    modal.style.pointerEvents = 'auto';
+}
+
+// Ajouter un chiffre au PIN
+function addPinDigit(digit) {
+    if (currentPin.length < 4) {
+        currentPin += digit;
+        updatePinDisplay();
+        
+        // Vibration tactile
+        if (navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+        
+        // Vérification automatique à 4 chiffres
+        if (currentPin.length === 4) {
+            setTimeout(submitPin, 200);
+        }
+    }
+}
+
+// Effacer le PIN
+function clearPin() {
+    currentPin = '';
+    updatePinDisplay();
+    document.getElementById('pinError').style.display = 'none';
+}
+
+// Mettre à jour l'affichage du PIN
+function updatePinDisplay() {
+    const display = document.getElementById('pinDisplay');
+    let displayText = '';
+    
+    for (let i = 0; i < 4; i++) {
+        if (i < currentPin.length) {
+            displayText += '●';
+        } else {
+            displayText += '○';
+        }
+    }
+    
+    display.textContent = displayText;
+}
+
+// Soumettre le PIN
+function submitPin() {
+    if (currentPin.length !== 4) {
+        shakePin();
+        return;
+    }
+    
+    if (isSettingPin) {
+        // Définir un nouveau PIN
+        appData.security = appData.security || {};
+        appData.security.pin = hashPin(currentPin);
+        appData.security.pinEnabled = true;
+        saveData();
+        
+        showSuccessMessage('Code PIN défini avec succès !');
+        document.body.style.pointerEvents = '';
+        closeModal('pinModal');
+        isSettingPin = false;
+    } else {
+        // Vérifier le PIN
+        if (verifyPin(currentPin)) {
+            // PIN correct
+            document.body.style.pointerEvents = '';
+            closeModal('pinModal');
+            pinAttempts = 0;
+            
+            // Démarrer le timer d'inactivité
+            startInactivityTimer();
+        } else {
+            // PIN incorrect
+            pinAttempts++;
+            shakePin();
+            currentPin = '';
+            updatePinDisplay();
+            
+            const errorDiv = document.getElementById('pinError');
+            errorDiv.style.display = 'block';
+            
+            if (pinAttempts >= MAX_ATTEMPTS) {
+                errorDiv.textContent = 'Trop de tentatives. Réinitialisation...';
+                setTimeout(() => {
+                    localStorage.clear();
+                    location.reload();
+                }, 2000);
+            } else {
+                errorDiv.textContent = `PIN incorrect. ${MAX_ATTEMPTS - pinAttempts} tentative(s) restante(s)`;
+            }
+        }
+    }
+}
+
+// Hacher le PIN
+function hashPin(pin) {
+    let hash = 0;
+    for (let i = 0; i < pin.length; i++) {
+        const char = pin.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash).toString();
+}
+
+// Vérifier le PIN
+function verifyPin(pin) {
+    return hashPin(pin) === appData.security.pin;
+}
+
+// Animation de secousse
+function shakePin() {
+    const modal = document.querySelector('#pinModal .modal-content');
+    modal.style.animation = 'shake 0.5s';
+    setTimeout(() => {
+        modal.style.animation = '';
+    }, 500);
+}
+
+// Timer d'inactivité
+let inactivityTimer;
+
+function startInactivityTimer() {
+    clearTimeout(inactivityTimer);
+    
+    if (!appData.security || !appData.security.pinEnabled) return;
+    
+    inactivityTimer = setTimeout(() => {
+        showPinScreen();
+    }, 5 * 60 * 1000); // 5 minutes
+}
+
+// Réinitialiser le timer sur activité
+document.addEventListener('click', startInactivityTimer);
+document.addEventListener('keypress', startInactivityTimer);
+document.addEventListener('touchstart', startInactivityTimer);
+
+// Activer/Désactiver le PIN
+function togglePinSecurity() {
+    if (appData.security && appData.security.pinEnabled) {
+        // Désactiver - demander le PIN actuel
+        document.getElementById('pinTitle').textContent = 'Entrez le PIN actuel pour désactiver';
+        currentPin = '';
+        updatePinDisplay();
+        isSettingPin = false;
+        
+        // Modifier temporairement submitPin
+        const originalSubmit = window.submitPin;
+        window.submitPin = function() {
+            if (currentPin.length !== 4) {
+                shakePin();
+                return;
+            }
+            
+            if (verifyPin(currentPin)) {
+                appData.security.pinEnabled = false;
+                appData.security.pin = null;
+                saveData();
+                showSuccessMessage('Code PIN désactivé');
+                document.body.style.pointerEvents = '';
+                closeModal('pinModal');
+                window.submitPin = originalSubmit;
+            } else {
+                shakePin();
+                currentPin = '';
+                updatePinDisplay();
+                document.getElementById('pinError').style.display = 'block';
+                document.getElementById('pinError').textContent = 'PIN incorrect';
+            }
+        };
+        
+        showPinScreen();
+    } else {
+        // Activer - définir nouveau PIN
+        isSettingPin = true;
+        currentPin = '';
+        updatePinDisplay();
+        document.getElementById('pinTitle').textContent = 'Définir un code PIN (4 chiffres)';
+        document.getElementById('pinError').style.display = 'none';
+        openModal('pinModal');
+    }
+}
+
 </script>
+
+<!-- Modal de sécurité PIN -->
+<div class="modal" id="pinModal">
+    <div class="modal-content" style="max-width: 350px;">
+        <div class="modal-header">
+            <span class="material-icons" style="margin-right: 0.5rem;">lock</span>
+            <span id="pinTitle">Entrez votre code PIN</span>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+            <div id="pinDisplay" style="font-size: 2rem; letter-spacing: 1rem; margin: 1rem 0;">
+                ○○○○
+            </div>
+            <div id="pinError" style="color: var(--danger); font-size: 0.875rem; margin-bottom: 1rem; display: none;"></div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; max-width: 200px; margin: 0 auto;">
+                <button class="pin-btn" onclick="addPinDigit(1)">1</button>
+                <button class="pin-btn" onclick="addPinDigit(2)">2</button>
+                <button class="pin-btn" onclick="addPinDigit(3)">3</button>
+                <button class="pin-btn" onclick="addPinDigit(4)">4</button>
+                <button class="pin-btn" onclick="addPinDigit(5)">5</button>
+                <button class="pin-btn" onclick="addPinDigit(6)">6</button>
+                <button class="pin-btn" onclick="addPinDigit(7)">7</button>
+                <button class="pin-btn" onclick="addPinDigit(8)">8</button>
+                <button class="pin-btn" onclick="addPinDigit(9)">9</button>
+                <button class="pin-btn" onclick="clearPin()">C</button>
+                <button class="pin-btn" onclick="addPinDigit(0)">0</button>
+                <button class="pin-btn" onclick="submitPin()">✓</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 	<!-- Popup de donation -->
 <div id="donationPopup" class="donation-overlay" style="display: none;">
     <div class="donation-popup">
