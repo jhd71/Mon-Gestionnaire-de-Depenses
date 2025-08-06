@@ -240,10 +240,6 @@
     <span class="material-icons">document_scanner</span>
     Scanner un ticket
 	</button>
-	<button class="btn" onclick="showRecurringList()">
-    <span class="material-icons">repeat</span>
-    Transactions récurrentes
-	</button>
 	<button class="btn" onclick="importData()">
             <span class="material-icons">upload</span>
             Importer des données
@@ -288,36 +284,6 @@
     </div>
 
     <script>
-    // État global de l'application avec catégories
-window.appData = {
-    users: {
-        'commun': {
-            name: 'Commun',
-            incomes: [],
-            expenses: []
-        }
-    },
-    categories: [
-        { id: 'alimentation', name: 'Alimentation', icon: '🛒', color: '#10b981' },
-        { id: 'transport', name: 'Transport', icon: '🚗', color: '#3b82f6' },
-        { id: 'logement', name: 'Logement', icon: '🏠', color: '#8b5cf6' },
-        { id: 'sante', name: 'Santé', icon: '💊', color: '#ef4444' },
-        { id: 'loisirs', name: 'Loisirs', icon: '🎮', color: '#f59e0b' },
-        { id: 'shopping', name: 'Shopping', icon: '🛍️', color: '#ec4899' },
-        { id: 'factures', name: 'Factures', icon: '📄', color: '#6366f1' },
-        { id: 'education', name: 'Éducation', icon: '📚', color: '#14b8a6' },
-        { id: 'restaurant', name: 'Restaurant', icon: '🍽️', color: '#f97316' },
-        { id: 'autre', name: 'Autre', icon: '📦', color: '#6b7280' }
-    ],
-    commonExpenses: [],
-    currentTab: 'dashboard',
-    theme: 'dark',
-    recurringItems: [], // Pour les dépenses récurrentes
-    security: {
-        pinEnabled: false,
-        pin: null
-    }
-};
 
     // Variables globales
     let currentUser = '';
@@ -1832,15 +1798,6 @@ function scanReceipt() {
         window.scanReceiptOCR();
     } else {
         alert('Le module de scan n\'est pas chargé. Veuillez rafraîchir la page.');
-    }
-}
-
-// Fonction pour afficher les transactions récurrentes (wrapper)
-function showRecurringList() {
-    if (typeof window.showRecurringListModal === 'function') {
-        window.showRecurringListModal();
-    } else {
-        alert('Le module des transactions récurrentes n\'est pas chargé. Veuillez rafraîchir la page.');
     }
 }
 
