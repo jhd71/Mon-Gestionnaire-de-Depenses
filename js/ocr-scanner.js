@@ -54,7 +54,7 @@ async function processReceiptOCR(base64Image) {
             logger: m => console.log(m)
         }
     );
-    
+
     const text = result.data.text;
     console.log('Texte OCR détecté :', text);
     return parseReceiptText(text);
