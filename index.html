@@ -25,12 +25,6 @@
 	<link rel="icon" type="image/png" sizes="16x16" href="./images/icon-16.png">
 	<meta name="msapplication-TileColor" content="#2563eb">
 	<meta name="msapplication-TileImage" content="./images/icon-144.png">
-	<!-- Ajoutez après les autres scripts -->
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-	<script src="js/ocr-scanner.js"></script>
-	<script src="js/pdf-export.js"></script>
-	<script src="js/security.js"></script>
-	<script src="js/recurring.js"></script>
 </head>
 <body>
     <div class="header">
@@ -253,10 +247,6 @@
 	<button class="btn" onclick="showRecurringList()">
     <span class="material-icons">repeat</span>
     Transactions récurrentes
-	</button>
-	<button class="btn" onclick="togglePinSecurity()">
-    <span class="material-icons">lock</span>
-    ${appData.security?.pinEnabled ? 'Désactiver' : 'Activer'} le code PIN
 	</button>
         <button class="btn" onclick="exportData()">
             <span class="material-icons">download</span>
@@ -1884,5 +1874,10 @@ function togglePinSecurity() {
         </p>
     </div>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/ocr-scanner.js"></script>
+<script src="js/pdf-export.js"></script>
+<!-- NE PAS charger security.js car le code est déjà dans index.html -->
+<script src="js/recurring.js"></script>
 </body>
 </html>
