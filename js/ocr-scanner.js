@@ -46,39 +46,28 @@ function fileToBase64(file) {
     });
 }
 
-// Traitement OCR avec Tesseract.js
+import Tesseract from 'tesseract.js';
+
 async function processReceiptOCR(base64Image) {
-    // Pour une vraie implémentation, utilisez Tesseract.js ou une API OCR
-    // Ici, simulation avec regex pour démo
-    
-    // Option 1: Tesseract.js (gratuit, fonctionne offline)
-    /*
-    const worker = await Tesseract.createWorker();
-    await worker.loadLanguage('fra');
+    const { createWorker } = Tesseract;
+
+    const worker = await createWorker({
+        logger: m => console.log(m), // Affiche la progression dans la console
+    });
+
+    await worker.load();
+    await worker.loadLanguage('fra'); // Langue française
     await worker.initialize('fra');
-    const { data: { text } } = await worker.recognize(base64Image);
+
+    const {
+        data: { text }
+    } = await worker.recognize(base64Image); // base64Image doit être au format data:image/png;base64,...
+
     await worker.terminate();
-    */
-    
-    // Option 2: API externe (ex: Google Vision, Azure, etc.)
-    // const text = await callOCRAPI(base64Image);
-    
-    // Pour la démo, utilisons un texte simulé
-    const simulatedText = `
-        CARREFOUR MARKET
-        Date: 06/01/2025
-        
-        PAIN COMPLET         1.20
-        LAIT DEMI-ECR       2.45
-        POMMES 1KG          3.50
-        POULET ROTI         8.90
-        FROMAGE COMTE       4.75
-        
-        TOTAL              20.80 EUR
-    `;
-    
-    return parseReceiptText(simulatedText);
+
+    return parseReceiptText(text); // Fonction de parsing déjà présente dans ton code
 }
+
 
 // Parser le texte du ticket
 function parseReceiptText(text) {
