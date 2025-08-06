@@ -289,7 +289,7 @@
 
     <script>
     // État global de l'application avec catégories
-let appData = {
+window.appData = {
     users: {
         'commun': {
             name: 'Commun',
@@ -1823,6 +1823,33 @@ function togglePinSecurity() {
         document.getElementById('pinTitle').textContent = 'Définir un code PIN (4 chiffres)';
         document.getElementById('pinError').style.display = 'none';
         openModal('pinModal');
+    }
+}
+
+// Fonction pour scanner un ticket (wrapper)
+function scanReceipt() {
+    if (typeof window.scanReceiptOCR === 'function') {
+        window.scanReceiptOCR();
+    } else {
+        alert('Le module de scan n\'est pas chargé. Veuillez rafraîchir la page.');
+    }
+}
+
+// Fonction pour afficher les transactions récurrentes (wrapper)
+function showRecurringList() {
+    if (typeof window.showRecurringListModal === 'function') {
+        window.showRecurringListModal();
+    } else {
+        alert('Le module des transactions récurrentes n\'est pas chargé. Veuillez rafraîchir la page.');
+    }
+}
+
+// Fonction pour exporter en PDF (wrapper)
+function exportToPDF() {
+    if (typeof window.exportToPDFDocument === 'function') {
+        window.exportToPDFDocument();
+    } else {
+        alert('Le module d\'export PDF n\'est pas chargé. Veuillez rafraîchir la page.');
     }
 }
 

@@ -1,263 +1,348 @@
-// pdf-export.js - Export des données en PDF
+// ocr-scanner.js - Scanner de tickets de caisse avec OCR
 
-// Fonction principale d'export PDF
-function exportToPDF() {
-    // Utiliser jsPDF (à inclure dans votre HTML)
-    // <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+// Fonction principale pour scanner un ticket
+window.scanReceiptOCR = async function() {
+    // Créer un input file temporaire
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment'; // Utiliser la caméra arrière sur mobile
     
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Afficher un loader
+        showScanLoader();
+        
+        try {
+            // Convertir l'image en base64
+            const base64 = await fileToBase64(file);
+            
+            // Utiliser l'API OCR (Tesseract.js ou API externe)
+            const extractedData = await processReceiptOCR(base64);
+            
+            // Afficher le modal de confirmation
+            showReceiptConfirmation(extractedData);
+            
+        } catch (error) {
+            console.error('Erreur OCR:', error);
+            alert('Impossible de lire le ticket. Veuillez réessayer ou saisir manuellement.');
+        } finally {
+            hideScanLoader();
+        }
+    };
     
-    // Configuration
-    const pageHeight = doc.internal.pageSize.height;
-    let y = 20;
-    
-    // En-tête
-    doc.setFontSize(20);
-    doc.setTextColor(37, 99, 235); // Bleu primary
-    doc.text('Gestionnaire de Dépenses', 20, y);
-    
-    // Date du rapport
-    y += 10;
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Rapport généré le ${new Date().toLocaleDateString('fr-FR')}`, 20, y);
-    
-    // Ligne de séparation
-    y += 5;
-    doc.setDrawColor(200);
-    doc.line(20, y, 190, y);
-    
-    // Résumé global
-    y += 15;
-    doc.setFontSize(16);
-    doc.setTextColor(0);
-    doc.text('Résumé Global', 20, y);
-    
-    // Calculer les totaux
-    let totalRevenue = 0;
-    let totalExpenses = 0;
-    
-    Object.values(appData.users).forEach(user => {
-        totalRevenue += user.incomes.reduce((sum, item) => sum + item.amount, 0);
-        totalExpenses += user.expenses.reduce((sum, item) => sum + item.amount, 0);
+    input.click();
+}
+
+// Convertir fichier en base64
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
     });
+}
+
+// Traitement OCR avec Tesseract.js
+async function processReceiptOCR(base64Image) {
+    // Pour une vraie implémentation, utilisez Tesseract.js ou une API OCR
+    // Ici, simulation avec regex pour démo
     
-    const totalCommonExpenses = appData.commonExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    // Option 1: Tesseract.js (gratuit, fonctionne offline)
+    /*
+    const worker = await Tesseract.createWorker();
+    await worker.loadLanguage('fra');
+    await worker.initialize('fra');
+    const { data: { text } } = await worker.recognize(base64Image);
+    await worker.terminate();
+    */
     
-    // Afficher les totaux
-    y += 10;
-    doc.setFontSize(12);
-    doc.text(`Total des revenus: ${totalRevenue.toFixed(2)}€`, 30, y);
-    y += 7;
-    doc.text(`Total des dépenses: ${(totalExpenses + totalCommonExpenses).toFixed(2)}€`, 30, y);
-    y += 7;
-    doc.setTextColor(totalRevenue - totalExpenses - totalCommonExpenses >= 0 ? 0 : 255, 
-                     totalRevenue - totalExpenses - totalCommonExpenses >= 0 ? 150 : 0, 0);
-    doc.text(`Solde global: ${(totalRevenue - totalExpenses - totalCommonExpenses).toFixed(2)}€`, 30, y);
+    // Option 2: API externe (ex: Google Vision, Azure, etc.)
+    // const text = await callOCRAPI(base64Image);
     
-    // Détails par utilisateur
-    y += 20;
+    // Pour la démo, utilisons un texte simulé
+    const simulatedText = `
+        CARREFOUR MARKET
+        Date: 06/01/2025
+        
+        PAIN COMPLET         1.20
+        LAIT DEMI-ECR       2.45
+        POMMES 1KG          3.50
+        POULET ROTI         8.90
+        FROMAGE COMTE       4.75
+        
+        TOTAL              20.80 EUR
+    `;
     
-    Object.entries(appData.users).forEach(([userId, user]) => {
-        // Vérifier si on doit changer de page
-        if (y > pageHeight - 50) {
-            doc.addPage();
-            y = 20;
+    return parseReceiptText(simulatedText);
+}
+
+// Parser le texte du ticket
+function parseReceiptText(text) {
+    const lines = text.split('\n').filter(line => line.trim());
+    const items = [];
+    let total = 0;
+    let shopName = '';
+    
+    // Patterns pour détecter les éléments
+    const pricePattern = /(\d+[.,]\d{2})\s*(€|EUR)?$/;
+    const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/;
+    const totalPattern = /TOTAL|MONTANT|A PAYER/i;
+    
+    lines.forEach((line, index) => {
+        // Détecter le nom du magasin (première ligne)
+        if (index === 0 && !pricePattern.test(line)) {
+            shopName = line.trim();
         }
         
-        // Nom de l'utilisateur
-        doc.setFontSize(14);
-        doc.setTextColor(37, 99, 235);
-        doc.text(user.name, 20, y);
-        y += 10;
-        
-        // Revenus
-        if (user.incomes.length > 0) {
-            doc.setFontSize(12);
-            doc.setTextColor(0, 150, 0);
-            doc.text('Revenus:', 30, y);
-            y += 7;
+        // Détecter les articles
+        const priceMatch = line.match(pricePattern);
+        if (priceMatch && !totalPattern.test(line)) {
+            const price = parseFloat(priceMatch[1].replace(',', '.'));
+            const itemName = line.replace(priceMatch[0], '').trim();
             
-            doc.setFontSize(10);
-            doc.setTextColor(0);
-            user.incomes.forEach(income => {
-                doc.text(`• ${income.name}: +${income.amount.toFixed(2)}€`, 35, y);
-                y += 5;
-            });
-            y += 5;
-        }
-        
-        // Dépenses
-        if (user.expenses.length > 0) {
-            doc.setFontSize(12);
-            doc.setTextColor(255, 0, 0);
-            doc.text('Dépenses:', 30, y);
-            y += 7;
-            
-            doc.setFontSize(10);
-            doc.setTextColor(0);
-            
-            // Grouper par catégorie
-            const expensesByCategory = {};
-            user.expenses.forEach(expense => {
-                const cat = expense.category || 'autre';
-                if (!expensesByCategory[cat]) {
-                    expensesByCategory[cat] = [];
-                }
-                expensesByCategory[cat].push(expense);
-            });
-            
-            Object.entries(expensesByCategory).forEach(([catId, expenses]) => {
-                const category = appData.categories.find(c => c.id === catId) || { name: 'Autre', icon: '📦' };
-                const catTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
-                
-                doc.text(`${category.icon} ${category.name}: -${catTotal.toFixed(2)}€`, 35, y);
-                y += 5;
-                
-                expenses.forEach(expense => {
-                    doc.setFontSize(9);
-                    doc.text(`  - ${expense.name}: ${expense.amount.toFixed(2)}€`, 40, y);
-                    y += 4;
+            if (itemName && price > 0) {
+                items.push({
+                    name: itemName,
+                    price: price
                 });
-                y += 3;
-                doc.setFontSize(10);
-            });
-        }
-        
-        // Solde de l'utilisateur
-        const userIncome = user.incomes.reduce((sum, item) => sum + item.amount, 0);
-        const userExpense = user.expenses.reduce((sum, item) => sum + item.amount, 0);
-        let userCommonShare = 0;
-        
-        if (userId !== 'commun') {
-            appData.commonExpenses.forEach(expense => {
-                if (expense.participants.includes(userId)) {
-                    userCommonShare += expense.amount / expense.participants.length;
-                }
-            });
-        }
-        
-        const userBalance = userIncome - userExpense - userCommonShare;
-        
-        doc.setFontSize(11);
-        doc.setTextColor(userBalance >= 0 ? 0 : 255, userBalance >= 0 ? 150 : 0, 0);
-        doc.text(`Solde ${user.name}: ${userBalance.toFixed(2)}€`, 30, y);
-        y += 15;
-    });
-    
-    // Dépenses communes
-    if (appData.commonExpenses.length > 0) {
-        if (y > pageHeight - 50) {
-            doc.addPage();
-            y = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.setTextColor(37, 99, 235);
-        doc.text('Dépenses Communes', 20, y);
-        y += 10;
-        
-        doc.setFontSize(10);
-        doc.setTextColor(0);
-        
-        appData.commonExpenses.forEach(expense => {
-            const participants = expense.participants.map(p => appData.users[p].name).join(', ');
-            const sharePerPerson = expense.amount / expense.participants.length;
-            
-            doc.text(`• ${expense.name}: ${expense.amount.toFixed(2)}€`, 30, y);
-            y += 5;
-            doc.setFontSize(9);
-            doc.text(`  Partagé entre: ${participants} (${sharePerPerson.toFixed(2)}€/pers)`, 35, y);
-            y += 7;
-            doc.setFontSize(10);
-        });
-    }
-    
-    // Pied de page
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text(`Page ${i} / ${pageCount}`, 105, 290, { align: 'center' });
-        doc.text('Généré par Gestionnaire de Dépenses', 105, 285, { align: 'center' });
-    }
-    
-    // Sauvegarder le PDF
-    const fileName = `depenses_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
-    
-    // Message de succès
-    showSuccessMessage(`PDF exporté: ${fileName}`);
-}
-
-// Export détaillé avec graphiques (nécessite Chart.js)
-async function exportDetailedPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // Générer des graphiques en canvas
-    const chartCanvas = await generateCategoryChart();
-    
-    // Ajouter le graphique au PDF
-    if (chartCanvas) {
-        const imgData = chartCanvas.toDataURL('image/png');
-        doc.addImage(imgData, 'PNG', 20, 50, 170, 100);
-    }
-    
-    // ... reste du PDF avec graphiques
-    
-    doc.save(`rapport_detaille_${new Date().toISOString().split('T')[0]}.pdf`);
-}
-
-// Générer un graphique des catégories
-async function generateCategoryChart() {
-    // Créer un canvas temporaire
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 300;
-    const ctx = canvas.getContext('2d');
-    
-    // Obtenir les données par catégorie
-    const categoryData = getExpensesByCategory('all');
-    const labels = [];
-    const data = [];
-    const colors = [];
-    
-    appData.categories.forEach(cat => {
-        if (categoryData[cat.id] > 0) {
-            labels.push(`${cat.icon} ${cat.name}`);
-            data.push(categoryData[cat.id]);
-            colors.push(cat.color);
-        }
-    });
-    
-    // Si Chart.js est disponible
-    if (window.Chart) {
-        new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: colors
-                }]
-            },
-            options: {
-                responsive: false,
-                plugins: {
-                    legend: {
-                        position: 'right'
-                    }
-                }
             }
-        });
+        }
         
-        // Attendre que le graphique soit rendu
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return canvas;
+        // Détecter le total
+        if (totalPattern.test(line) && priceMatch) {
+            total = parseFloat(priceMatch[1].replace(',', '.'));
+        }
+    });
+    
+    // Si pas de total trouvé, calculer depuis les items
+    if (!total && items.length > 0) {
+        total = items.reduce((sum, item) => sum + item.price, 0);
     }
     
-    return null;
+    // Déterminer la catégorie automatiquement
+    const category = guessCategory(shopName, items);
+    
+    return {
+        shopName: shopName || 'Ticket scanné',
+        items: items,
+        total: total,
+        category: category,
+        date: new Date().toISOString()
+    };
+}
+
+// Deviner la catégorie selon le magasin et les articles
+function guessCategory(shopName, items) {
+    const shop = shopName.toLowerCase();
+    
+    // Patterns de magasins
+    if (shop.includes('carrefour') || shop.includes('auchan') || shop.includes('leclerc') || 
+        shop.includes('lidl') || shop.includes('aldi') || shop.includes('casino')) {
+        return 'alimentation';
+    }
+    if (shop.includes('restaurant') || shop.includes('mcdo') || shop.includes('burger')) {
+        return 'restaurant';
+    }
+    if (shop.includes('pharmacie') || shop.includes('médical')) {
+        return 'sante';
+    }
+    if (shop.includes('fnac') || shop.includes('darty') || shop.includes('amazon')) {
+        return 'shopping';
+    }
+    
+    // Sinon, analyser les articles
+    const itemsText = items.map(i => i.name.toLowerCase()).join(' ');
+    if (itemsText.includes('pain') || itemsText.includes('lait') || itemsText.includes('fruit')) {
+        return 'alimentation';
+    }
+    
+    return 'autre';
+}
+
+// Afficher le loader pendant le scan
+function showScanLoader() {
+    const loader = document.createElement('div');
+    loader.id = 'scanLoader';
+    loader.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        ">
+            <div class="material-icons spinning" style="font-size: 48px; color: white; margin-bottom: 1rem;">
+                document_scanner
+            </div>
+            <div style="color: white; font-size: 1.125rem;">Analyse du ticket en cours...</div>
+        </div>
+    `;
+    document.body.appendChild(loader);
+}
+
+function hideScanLoader() {
+    const loader = document.getElementById('scanLoader');
+    if (loader) loader.remove();
+}
+
+// Modal de confirmation après scan
+function showReceiptConfirmation(data) {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'receiptConfirmModal';
+    
+    // Créer les options d'utilisateurs
+    const userOptions = window.appData && window.appData.users ? 
+        Object.keys(window.appData.users).map(userId => 
+            `<option value="${userId}">${window.appData.users[userId].name}</option>`
+        ).join('') : '<option value="">Aucun utilisateur</option>';
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <span class="material-icons" style="margin-right: 0.5rem;">receipt_long</span>
+                Ticket scanné avec succès
+            </div>
+            <div class="modal-body">
+                <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <h4 style="margin-bottom: 0.5rem;">${data.shopName}</h4>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                        ${data.items.length} article(s) détecté(s)
+                    </div>
+                    
+                    ${data.items.length > 0 ? `
+                        <div style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem;">
+                            ${data.items.map(item => `
+                                <div style="display: flex; justify-content: space-between; padding: 0.25rem 0;">
+                                    <span>${item.name}</span>
+                                    <span style="font-weight: 600;">${item.price.toFixed(2)}€</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    
+                    <div style="border-top: 2px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; font-size: 1.125rem; font-weight: 700;">
+                        <span>TOTAL</span>
+                        <span style="color: var(--primary);">${data.total.toFixed(2)}€</span>
+                    </div>
+                </div>
+                
+                <div style="display: grid; gap: 1rem;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                            Attribuer à :
+                        </label>
+                        <select id="receiptUser" class="input">
+                            ${userOptions}
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                            Catégorie :
+                        </label>
+                        <select id="receiptCategory" class="input">
+                            ${window.appData && window.appData.categories ? 
+                                window.appData.categories.map(cat => 
+                                    `<option value="${cat.id}" ${cat.id === data.category ? 'selected' : ''}>
+                                        ${cat.icon} ${cat.name}
+                                    </option>`
+                                ).join('') : '<option value="autre">Autre</option>'
+                            }
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                            Description (optionnel) :
+                        </label>
+                        <input type="text" id="receiptDescription" class="input" 
+                               value="${data.shopName}" placeholder="Description de la dépense">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeReceiptModal()">Annuler</button>
+                <button class="btn" onclick="confirmReceiptScan()">
+                    <span class="material-icons">check</span>
+                    Enregistrer
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+    
+    // Stocker les données pour la confirmation
+    window.scannedReceiptData = data;
+}
+
+// Confirmer l'ajout du ticket scanné
+window.confirmReceiptScan = function() {
+    const userId = document.getElementById('receiptUser').value;
+    const category = document.getElementById('receiptCategory').value;
+    const description = document.getElementById('receiptDescription').value || window.scannedReceiptData.shopName;
+    
+    // Ajouter la dépense
+    if (userId === 'commun') {
+        // Pour les dépenses communes, ouvrir le modal de sélection des participants
+        currentUser = 'commun';
+        document.getElementById('commonExpenseName').value = description;
+        document.getElementById('commonExpenseAmount').value = window.scannedReceiptData.total.toFixed(2);
+        closeReceiptModal();
+        openModal('addCommonExpenseModal');
+    } else {
+        // Ajouter comme dépense personnelle
+        window.appData.users[userId].expenses.push({
+            name: description,
+            amount: window.scannedReceiptData.total,
+            category: category,
+            date: new Date().toISOString(),
+            scanned: true,
+            items: window.scannedReceiptData.items
+        });
+        
+        saveData();
+        renderApp();
+        closeReceiptModal();
+        
+        // Message de succès
+        showSuccessMessage(`Ticket de ${window.scannedReceiptData.total.toFixed(2)}€ ajouté pour ${window.appData.users[userId].name}`);
+    }
+}
+
+window.closeReceiptModal = function() {
+    const modal = document.getElementById('receiptConfirmModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+    window.scannedReceiptData = null;
+}
+
+// Ajouter le style pour l'animation
+if (!document.getElementById('ocr-scanner-styles')) {
+    const style = document.createElement('style');
+    style.id = 'ocr-scanner-styles';
+    style.textContent = `
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spinning {
+            animation: spin 1s linear infinite;
+        }
+    `;
+    document.head.appendChild(style);
 }

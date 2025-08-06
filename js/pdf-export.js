@@ -1,7 +1,7 @@
 // pdf-export.js - Export des données en PDF
 
 // Fonction principale d'export PDF
-function exportToPDF() {
+window.exportToPDFDocument = function() {
     // Utiliser jsPDF (à inclure dans votre HTML)
     // <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
@@ -38,12 +38,12 @@ function exportToPDF() {
     let totalRevenue = 0;
     let totalExpenses = 0;
     
-    Object.values(appData.users).forEach(user => {
+    Object.values(window.appData.users).forEach(user => {
         totalRevenue += user.incomes.reduce((sum, item) => sum + item.amount, 0);
         totalExpenses += user.expenses.reduce((sum, item) => sum + item.amount, 0);
     });
     
-    const totalCommonExpenses = appData.commonExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const totalCommonExpenses = window.appData.commonExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     
     // Afficher les totaux
     y += 10;
@@ -59,7 +59,7 @@ function exportToPDF() {
     // Détails par utilisateur
     y += 20;
     
-    Object.entries(appData.users).forEach(([userId, user]) => {
+    Object.entries(window.appData.users).forEach(([userId, user]) => {
         // Vérifier si on doit changer de page
         if (y > pageHeight - 50) {
             doc.addPage();
@@ -109,7 +109,7 @@ function exportToPDF() {
             });
             
             Object.entries(expensesByCategory).forEach(([catId, expenses]) => {
-                const category = appData.categories.find(c => c.id === catId) || { name: 'Autre', icon: '📦' };
+                const category = window.appData.categories.find(c => c.id === catId) || { name: 'Autre', icon: '📦' };
                 const catTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
                 
                 doc.text(`${category.icon} ${category.name}: -${catTotal.toFixed(2)}€`, 35, y);
@@ -131,7 +131,7 @@ function exportToPDF() {
         let userCommonShare = 0;
         
         if (userId !== 'commun') {
-            appData.commonExpenses.forEach(expense => {
+            window.appData.commonExpenses.forEach(expense => {
                 if (expense.participants.includes(userId)) {
                     userCommonShare += expense.amount / expense.participants.length;
                 }
@@ -147,7 +147,7 @@ function exportToPDF() {
     });
     
     // Dépenses communes
-    if (appData.commonExpenses.length > 0) {
+    if (window.appData.commonExpenses.length > 0) {
         if (y > pageHeight - 50) {
             doc.addPage();
             y = 20;
@@ -161,8 +161,8 @@ function exportToPDF() {
         doc.setFontSize(10);
         doc.setTextColor(0);
         
-        appData.commonExpenses.forEach(expense => {
-            const participants = expense.participants.map(p => appData.users[p].name).join(', ');
+        window.appData.commonExpenses.forEach(expense => {
+            const participants = expense.participants.map(p => window.appData.users[p].name).join(', ');
             const sharePerPerson = expense.amount / expense.participants.length;
             
             doc.text(`• ${expense.name}: ${expense.amount.toFixed(2)}€`, 30, y);
@@ -225,7 +225,7 @@ async function generateCategoryChart() {
     const data = [];
     const colors = [];
     
-    appData.categories.forEach(cat => {
+    window.appData.categories.forEach(cat => {
         if (categoryData[cat.id] > 0) {
             labels.push(`${cat.icon} ${cat.name}`);
             data.push(categoryData[cat.id]);

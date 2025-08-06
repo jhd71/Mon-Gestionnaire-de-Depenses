@@ -1,7 +1,7 @@
 // recurring.js - Gestion des dépenses et revenus récurrents
 
 // Ajouter une dépense récurrente
-function addRecurringItem() {
+window.addRecurringItem = function() {
     const modal = document.createElement('div');
     modal.className = 'modal active';
     modal.id = 'recurringModal';
@@ -27,9 +27,12 @@ function addRecurringItem() {
                     <div>
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Pour</label>
                         <select id="recurringUser" class="input">
-                            ${Object.entries(appData.users).map(([id, user]) => 
-                                `<option value="${id}">${user.name}</option>`
-                            ).join('')}
+                            ${window.appData && window.appData.users ? 
+                                Object.entries(window.appData.users).map(([id, user]) => 
+                                    `<option value="${id}">${user.name}</option>`
+                                ).join('') : 
+                                '<option value="">Aucun utilisateur</option>'
+                            }
                         </select>
                     </div>
                     
@@ -49,7 +52,7 @@ function addRecurringItem() {
                     <div id="categoryDiv">
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Catégorie</label>
                         <select id="recurringCategory" class="input">
-                            ${appData.categories.map(cat => 
+                            ${window.appData.categories.map(cat => 
                                 `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
                             ).join('')}
                         </select>
@@ -107,7 +110,7 @@ function updateRecurringForm() {
 }
 
 // Confirmer l'ajout d'une transaction récurrente
-function confirmAddRecurring() {
+window.confirmAddRecurring = function() {
     const recurring = {
         id: 'recurring_' + Date.now(),
         type: document.getElementById('recurringType').value,
@@ -122,16 +125,18 @@ function confirmAddRecurring() {
         active: true
     };
     
-    if (!recurring.name || !recurring.amount || recurring.amount <= 0) {
-        alert('Veuillez remplir tous les champs requis');
+    console.log('Données récurrentes:', recurring); // Debug
+    
+    if (!recurring.name || isNaN(recurring.amount) || recurring.amount <= 0) {
+        alert('Veuillez remplir tous les champs requis (nom et montant valide)');
         return;
     }
     
     // Ajouter à la liste des récurrences
-    if (!appData.recurringItems) {
-        appData.recurringItems = [];
+    if (!window.appData.recurringItems) {
+        window.appData.recurringItems = [];
     }
-    appData.recurringItems.push(recurring);
+    window.appData.recurringItems.push(recurring);
     
     saveData();
     closeModal('recurringModal');
@@ -142,17 +147,17 @@ function confirmAddRecurring() {
     showSuccessMessage('Transaction récurrente créée !');
     
     // Afficher la liste mise à jour
-    showRecurringList();
+    window.showRecurringListModal();
 }
 
 // Vérifier et ajouter les transactions récurrentes échues
 function checkAndAddRecurringItems() {
-    if (!appData.recurringItems) return;
+    if (!window.appData.recurringItems) return;
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    appData.recurringItems.forEach(recurring => {
+    window.appData.recurringItems.forEach(recurring => {
         if (!recurring.active || !recurring.autoAdd) return;
         
         const nextDate = calculateNextDate(recurring);
@@ -160,7 +165,7 @@ function checkAndAddRecurringItems() {
         if (nextDate <= today) {
             // Ajouter la transaction
             if (recurring.type === 'expense') {
-                appData.users[recurring.userId].expenses.push({
+                window.appData.users[recurring.userId].expenses.push({
                     name: `${recurring.name} (automatique)`,
                     amount: recurring.amount,
                     category: recurring.category,
@@ -169,7 +174,7 @@ function checkAndAddRecurringItems() {
                     recurringId: recurring.id
                 });
             } else {
-                appData.users[recurring.userId].incomes.push({
+                window.appData.users[recurring.userId].incomes.push({
                     name: `${recurring.name} (automatique)`,
                     amount: recurring.amount,
                     date: new Date().toISOString(),
@@ -219,12 +224,12 @@ function calculateNextDate(recurring) {
 }
 
 // Afficher la liste des transactions récurrentes
-function showRecurringList() {
+window.showRecurringListModal = function() {
     const modal = document.createElement('div');
     modal.className = 'modal active';
     modal.id = 'recurringListModal';
     
-    const recurringItems = appData.recurringItems || [];
+    const recurringItems = window.appData.recurringItems || [];
     
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 600px;">
@@ -242,9 +247,9 @@ function showRecurringList() {
                     '<div class="empty-state">Aucune transaction récurrente</div>' :
                     `<div class="items-list">
                         ${recurringItems.map(item => {
-                            const user = appData.users[item.userId];
+                            const user = window.appData.users[item.userId];
                             const nextDate = calculateNextDate(item);
-                            const category = appData.categories.find(c => c.id === item.category);
+                            const category = window.appData.categories.find(c => c.id === item.category);
                             
                             return `
                                 <div class="item" style="padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 0.5rem;">
@@ -300,7 +305,7 @@ function showRecurringList() {
 // Supprimer une transaction récurrente
 function deleteRecurring(id) {
     if (confirm('Supprimer cette transaction récurrente ?')) {
-        appData.recurringItems = appData.recurringItems.filter(item => item.id !== id);
+        window.appData.recurringItems = window.appData.recurringItems.filter(item => item.id !== id);
         saveData();
         closeModal('recurringListModal');
         showRecurringList();
@@ -309,7 +314,7 @@ function deleteRecurring(id) {
 
 // Activer/Désactiver une transaction récurrente
 function toggleRecurringActive(id) {
-    const item = appData.recurringItems.find(r => r.id === id);
+    const item = window.appData.recurringItems.find(r => r.id === id);
     if (item) {
         item.active = !item.active;
         saveData();
@@ -320,11 +325,11 @@ function toggleRecurringActive(id) {
 
 // Ajouter manuellement une transaction récurrente
 function addRecurringNow(id) {
-    const recurring = appData.recurringItems.find(r => r.id === id);
+    const recurring = window.appData.recurringItems.find(r => r.id === id);
     if (!recurring) return;
     
     if (recurring.type === 'expense') {
-        appData.users[recurring.userId].expenses.push({
+        window.appData.users[recurring.userId].expenses.push({
             name: recurring.name,
             amount: recurring.amount,
             category: recurring.category,
@@ -333,7 +338,7 @@ function addRecurringNow(id) {
             recurringId: recurring.id
         });
     } else {
-        appData.users[recurring.userId].incomes.push({
+        window.appData.users[recurring.userId].incomes.push({
             name: recurring.name,
             amount: recurring.amount,
             date: new Date().toISOString(),
