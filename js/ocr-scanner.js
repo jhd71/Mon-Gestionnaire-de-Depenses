@@ -46,26 +46,18 @@ function fileToBase64(file) {
     });
 }
 
-import Tesseract from 'tesseract.js';
-
 async function processReceiptOCR(base64Image) {
-    const { createWorker } = Tesseract;
-
-    const worker = await createWorker({
-        logger: m => console.log(m), // Affiche la progression dans la console
-    });
-
-    await worker.load();
-    await worker.loadLanguage('fra'); // Langue française
-    await worker.initialize('fra');
-
-    const {
-        data: { text }
-    } = await worker.recognize(base64Image); // base64Image doit être au format data:image/png;base64,...
-
-    await worker.terminate();
-
-    return parseReceiptText(text); // Fonction de parsing déjà présente dans ton code
+    const result = await Tesseract.recognize(
+        base64Image,
+        'fra',
+        {
+            logger: m => console.log(m)
+        }
+    );
+    
+    const text = result.data.text;
+    console.log('Texte OCR détecté :', text);
+    return parseReceiptText(text);
 }
 
 
