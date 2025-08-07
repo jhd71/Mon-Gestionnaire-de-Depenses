@@ -29,7 +29,7 @@ window.scanReceiptOCR = function() {
     modal.style.zIndex = '10000';
     
     modal.innerHTML = `
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: inherit;">
             <div class="modal-header" style="position: sticky; top: 0; background: var(--bg-secondary); z-index: 10; padding: 1rem; border-bottom: 1px solid var(--border);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; align-items: center;">
@@ -133,7 +133,7 @@ window.scanReceiptOCR = function() {
                     </div>
                 </div>
             </div>
-            <div class="modal-footer" style="position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-secondary); border-top: 1px solid var(--border); padding: 1rem; display: flex; justify-content: flex-end; gap: 1rem; z-index: 10;">
+            <div class="modal-footer" style="position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-secondary); border-top: 1px solid var(--border); padding: inherit; display: flex; justify-content: flex-end; gap: 1rem; z-index: 10;">
                 <button class="btn btn-danger" onclick="window.closeScanModal()">Annuler</button>
                 <button id="addScannedExpense" class="btn" style="display: none;" onclick="window.addScannedExpense()">
                     <span class="material-icons">add</span>
