@@ -428,15 +428,33 @@ window.analyzeReceiptText = function(text) {
     // Collecter tous les montants trouvés
     let amounts = [];
     for (let line of lines) {
-        // Chercher spécifiquement les lignes de total
-        if (/TOTAL|MONTANT|PAYER|REGLEMENT|ESPECES|CB/i.test(line)) {
-            for (let pattern of amountPatterns) {
-                const match = line.match(pattern);
-                if (match) {
-                    const amount = parseAmount(match[1]);
-                    if (!isNaN(amount) && amount > 0 && amount < 10000) {
-                        amounts.push(amount);
-                        console.log('Montant trouvé dans ligne de total:', amount, 'depuis:', line);
+        // Chercher spécifiquement les lignes de total ou règlement
+        if (/TOTAL|MONTANT|PAYER|REGLER|REGLEMENT|ESPECES|CB|CHEQUE/i.test(line)) {
+            // Chercher un montant dans cette ligne
+            // Pattern spécial pour les montants avec virgule sans espace (31,8)
+            const specialMatch = line.match(/([0-9]+),([0-9]{1,2})(?!\d)/);
+            if (specialMatch) {
+                const euros = specialMatch[1];
+                let cents = specialMatch[2];
+                // Si un seul chiffre après la virgule, c'est des dizaines de centimes
+                if (cents.length === 1) {
+                    cents = cents + '0';
+                }
+                const amount = parseFloat(euros + '.' + cents);
+                if (!isNaN(amount) && amount > 0 && amount < 1000) {
+                    amounts.push(amount);
+                    console.log('Montant spécial trouvé:', amount, 'depuis:', line);
+                }
+            } else {
+                // Patterns standards
+                for (let pattern of amountPatterns) {
+                    const match = line.match(pattern);
+                    if (match) {
+                        const amount = parseAmount(match[1]);
+                        if (!isNaN(amount) && amount > 0 && amount < 1000) {
+                            amounts.push(amount);
+                            console.log('Montant trouvé dans ligne de total:', amount, 'depuis:', line);
+                        }
                     }
                 }
             }
@@ -597,6 +615,12 @@ window.addScannedExpense = function() {
     // Créer la description de la dépense
     const description = `${store} - Ticket scanné`;
     
+    // S'assurer que window.appData existe
+    if (!window.appData) {
+        alert('Erreur: Les données de l\'application ne sont pas accessibles');
+        return;
+    }
+    
     if (assignTo === 'commun') {
         // Dépense commune
         const participants = [];
@@ -609,6 +633,10 @@ window.addScannedExpense = function() {
             return;
         }
         
+        if (!window.appData.commonExpenses) {
+            window.appData.commonExpenses = [];
+        }
+        
         window.appData.commonExpenses.push({
             name: description,
             amount: amount,
@@ -618,6 +646,15 @@ window.addScannedExpense = function() {
         });
     } else {
         // Dépense individuelle
+        if (!window.appData.users[assignTo]) {
+            alert('Erreur: Utilisateur non trouvé');
+            return;
+        }
+        
+        if (!window.appData.users[assignTo].expenses) {
+            window.appData.users[assignTo].expenses = [];
+        }
+        
         window.appData.users[assignTo].expenses.push({
             name: description,
             amount: amount,
@@ -627,8 +664,16 @@ window.addScannedExpense = function() {
     }
     
     // Sauvegarder et rafraîchir
-    window.saveData();
-    window.renderApp();
+    if (typeof window.saveData === 'function') {
+        window.saveData();
+    } else {
+        // Essayer de sauvegarder directement dans localStorage
+        localStorage.setItem('expenseTrackerData', JSON.stringify(window.appData));
+    }
+    
+    if (typeof window.renderApp === 'function') {
+        window.renderApp();
+    }
     
     // Fermer le modal
     window.closeScanModal();

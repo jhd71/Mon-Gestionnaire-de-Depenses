@@ -314,7 +314,68 @@
     
     // S'assurer que appData sera synchronisé après le chargement
     loadData();
-    window.appData = appData;
+    // Exposer les données et fonctions globalement pour les modules externes
+window.appData = appData;
+window.saveData = saveData;
+window.renderApp = renderApp;
+window.closeModal = closeModal;
+window.openModal = openModal;
+
+// Fonction pour afficher un message de succès
+window.showSuccessMessage = function(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+        z-index: 10000;
+        font-weight: 600;
+        font-size: 1.125rem;
+        animation: slideInDown 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOutUp 0.4s ease-in';
+        setTimeout(() => toast.remove(), 400);
+    }, 3000);
+};
+
+// Ajouter les animations CSS si elles n'existent pas
+if (!document.getElementById('toastAnimations')) {
+    const style = document.createElement('style');
+    style.id = 'toastAnimations';
+    style.textContent = `
+        @keyframes slideInDown {
+            from {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOutUp {
+            from {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+            to {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
     // Forcer la synchronisation du thème après le chargement des données
     if (appData.theme !== preferredTheme) {
         appData.theme = preferredTheme;
