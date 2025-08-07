@@ -6,9 +6,12 @@
     // Vérifier si Tesseract n'est pas déjà chargé
     if (!window.Tesseract) {
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
         script.onload = () => {
             console.log('Tesseract.js chargé avec succès');
+        };
+        script.onerror = () => {
+            console.error('Erreur lors du chargement de Tesseract.js');
         };
         document.head.appendChild(script);
     }
@@ -46,7 +49,7 @@ window.scanReceiptOCR = function() {
                     <span class="material-icons" style="font-size: 48px; color: var(--primary); display: block; margin-bottom: 1rem;">add_photo_alternate</span>
                     <p style="margin: 0.5rem 0; font-weight: 600;">Cliquez pour choisir une photo</p>
                     <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">ou prenez une photo avec votre appareil</p>
-                    <input type="file" id="receiptImageInput" accept="image/*" capture="camera" style="display: none;" onchange="window.processReceiptImage(this)">
+                    <input type="file" id="receiptImageInput" accept="image/*" capture="environment" style="display: none;" onchange="window.processReceiptImage(this)">
                 </div>
                 
                 <!-- Aperçu de l'image -->
@@ -76,11 +79,11 @@ window.scanReceiptOCR = function() {
                 <div id="scanResults" style="display: none;">
                     <h3 style="margin-bottom: 1rem;">Résultats de l'analyse</h3>
                     
-                    <!-- Texte brut extrait -->
-                    <div style="margin-bottom: 1rem; display: none;">
-                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Texte extrait :</label>
-                        <textarea id="extractedText" readonly style="width: 100%; min-height: 100px; padding: 0.75rem; border-radius: 8px; background: var(--bg-tertiary); border: 1px solid var(--border); font-family: monospace; font-size: 0.875rem;"></textarea>
-                    </div>
+                    <!-- Texte brut extrait (debug) -->
+                    <details style="margin-bottom: 1rem;">
+                        <summary style="cursor: pointer; font-weight: 600; margin-bottom: 0.5rem;">Texte extrait (debug)</summary>
+                        <textarea id="extractedText" readonly style="width: 100%; min-height: 100px; padding: 0.75rem; border-radius: 8px; background: var(--bg-tertiary); border: 1px solid var(--border); font-family: monospace; font-size: 0.875rem; margin-top: 0.5rem;"></textarea>
+                    </details>
                     
                     <!-- Données extraites -->
                     <div style="display: grid; gap: 1rem;">
@@ -198,72 +201,88 @@ window.processReceiptImage = async function(input) {
     document.getElementById('scanResults').style.display = 'none';
     
     try {
-        // Créer un worker Tesseract
-        const worker = await Tesseract.createWorker('fra', 1, {
-            logger: m => {
-                // Mise à jour de la progression
-                if (m.status) {
-                    document.getElementById('scanProgressText').textContent = 
-                        m.status === 'initializing api' ? 'Initialisation...' :
-                        m.status === 'loading language traineddata' ? 'Chargement du modèle français...' :
-                        m.status === 'recognizing text' ? 'Analyse du texte...' :
-                        m.status;
-                }
-                if (m.progress) {
-                    const percent = Math.round(m.progress * 100);
-                    document.getElementById('progressBar').style.width = percent + '%';
+        // Utiliser Tesseract directement sans worker pour éviter les problèmes
+        console.log('Début de la reconnaissance OCR...');
+        
+        await Tesseract.recognize(
+            file,
+            'fra', // Langue française
+            {
+                logger: m => {
+                    console.log('OCR Progress:', m);
+                    // Mise à jour de la progression
+                    if (m.status) {
+                        document.getElementById('scanProgressText').textContent = 
+                            m.status === 'initializing api' ? 'Initialisation de l\'OCR...' :
+                            m.status === 'initializing tesseract' ? 'Chargement de Tesseract...' :
+                            m.status === 'loading language traineddata' ? 'Chargement du modèle français...' :
+                            m.status === 'recognizing text' ? 'Analyse du texte en cours...' :
+                            m.status === 'initialized tesseract' ? 'Tesseract initialisé...' :
+                            m.status;
+                    }
+                    if (typeof m.progress === 'number') {
+                        const percent = Math.round(m.progress * 100);
+                        document.getElementById('progressBar').style.width = percent + '%';
+                    }
                 }
             }
+        ).then(({ data: { text } }) => {
+            console.log('Texte reconnu:', text);
+            // Analyser le texte extrait
+            window.analyzeReceiptText(text);
+        }).catch(error => {
+            console.error('Erreur Tesseract:', error);
+            throw error;
         });
-        
-        // Reconnaissance du texte
-        const { data: { text } } = await worker.recognize(file);
-        
-        // Terminer le worker
-        await worker.terminate();
-        
-        // Analyser le texte extrait
-        window.analyzeReceiptText(text);
         
     } catch (error) {
         console.error('Erreur OCR:', error);
-        alert('Erreur lors de l\'analyse de l\'image. Veuillez réessayer.');
+        alert('Erreur lors de l\'analyse de l\'image. Veuillez réessayer avec une image plus claire.');
         document.getElementById('scanProgress').style.display = 'none';
+        document.getElementById('scanUploadArea').style.display = 'block';
+        document.getElementById('imagePreview').style.display = 'none';
     }
 };
 
 // Analyser le texte du ticket
 window.analyzeReceiptText = function(text) {
-    console.log('Texte extrait:', text);
+    console.log('Analyse du texte extrait:', text);
     
     // Cacher la progression et afficher les résultats
     document.getElementById('scanProgress').style.display = 'none';
     document.getElementById('scanResults').style.display = 'block';
     document.getElementById('addScannedExpense').style.display = 'inline-flex';
     
-    // Afficher le texte brut (pour debug, caché par défaut)
+    // Afficher le texte brut pour debug
     document.getElementById('extractedText').value = text;
     
-    // Extraire les informations
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+    // Nettoyer et préparer les lignes
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     
-    // 1. Détecter le nom du magasin (généralement dans les premières lignes)
+    // 1. Détecter le nom du magasin
     let storeName = '';
     const storePatterns = [
-        /CARREFOUR|LECLERC|AUCHAN|LIDL|ALDI|INTERMARCHE|SUPER U|MONOPRIX|FRANPRIX|CASINO/i,
-        /BOULANGERIE|PHARMACIE|TABAC|RESTAURANT|CAFE|BRASSERIE/i
+        /CARREFOUR|LECLERC|AUCHAN|LIDL|ALDI|INTERMARCHE|SUPER U|MONOPRIX|FRANPRIX|CASINO|CORA|MATCH/i,
+        /BOULANGERIE|PHARMACIE|TABAC|RESTAURANT|CAFE|BRASSERIE|PIZZERIA|KEBAB/i,
+        /DECATHLON|FNAC|DARTY|IKEA|LEROY MERLIN|CASTORAMA|BRICO/i,
+        /TOTAL|SHELL|ESSO|BP|STATION/i
     ];
     
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
+    // Chercher dans les 10 premières lignes
+    for (let i = 0; i < Math.min(10, lines.length); i++) {
+        let found = false;
         for (let pattern of storePatterns) {
-            if (pattern.test(lines[i])) {
-                storeName = lines[i];
+            const match = lines[i].match(pattern);
+            if (match) {
+                storeName = match[0].toUpperCase();
+                found = true;
                 break;
             }
         }
-        if (storeName) break;
-        // Si pas de pattern, prendre la première ligne non vide comme nom
-        if (i === 0 && lines[i].length > 2 && lines[i].length < 50) {
+        if (found) break;
+        
+        // Si pas de pattern trouvé et c'est une des premières lignes
+        if (i < 3 && lines[i].length > 2 && lines[i].length < 50 && /^[A-Z]/.test(lines[i])) {
             storeName = lines[i];
         }
     }
@@ -271,34 +290,70 @@ window.analyzeReceiptText = function(text) {
     // 2. Détecter la date
     let detectedDate = '';
     const datePatterns = [
-        /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/,  // DD/MM/YYYY ou DD-MM-YYYY
-        /(\d{2,4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/,  // YYYY/MM/DD
+        /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/,  // DD/MM/YYYY ou DD-MM-YY
+        /(\d{2,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/,  // YYYY/MM/DD
+        /(\d{1,2})\s+(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)\s+(\d{2,4})/i,
+        /(\d{1,2})\s+(jan|fév|fev|mar|avr|mai|juin|juil|août|aout|sept|oct|nov|déc|dec)\s+(\d{2,4})/i
     ];
     
+    const monthMap = {
+        'janvier': '01', 'jan': '01',
+        'février': '02', 'fevrier': '02', 'fév': '02', 'fev': '02',
+        'mars': '03', 'mar': '03',
+        'avril': '04', 'avr': '04',
+        'mai': '05',
+        'juin': '06',
+        'juillet': '07', 'juil': '07',
+        'août': '08', 'aout': '08',
+        'septembre': '09', 'sept': '09',
+        'octobre': '10', 'oct': '10',
+        'novembre': '11', 'nov': '11',
+        'décembre': '12', 'decembre': '12', 'déc': '12', 'dec': '12'
+    };
+    
     for (let line of lines) {
-        for (let pattern of datePatterns) {
-            const match = line.match(pattern);
+        for (let i = 0; i < datePatterns.length; i++) {
+            const match = line.match(datePatterns[i]);
             if (match) {
-                // Convertir en format YYYY-MM-DD pour l'input date
-                let day, month, year;
-                if (match[3].length === 4) {
-                    // Format DD/MM/YYYY
-                    day = match[1].padStart(2, '0');
-                    month = match[2].padStart(2, '0');
-                    year = match[3];
-                } else if (match[1].length === 4) {
-                    // Format YYYY/MM/DD
-                    year = match[1];
-                    month = match[2].padStart(2, '0');
-                    day = match[3].padStart(2, '0');
+                if (i < 2) {
+                    // Formats numériques
+                    let day, month, year;
+                    if (match[3] && match[3].length === 4) {
+                        // Format DD/MM/YYYY
+                        day = match[1].padStart(2, '0');
+                        month = match[2].padStart(2, '0');
+                        year = match[3];
+                    } else if (match[1] && match[1].length === 4) {
+                        // Format YYYY/MM/DD
+                        year = match[1];
+                        month = match[2].padStart(2, '0');
+                        day = match[3].padStart(2, '0');
+                    } else {
+                        // Format DD/MM/YY
+                        day = match[1].padStart(2, '0');
+                        month = match[2].padStart(2, '0');
+                        year = parseInt(match[3]) > 50 ? '19' + match[3] : '20' + match[3];
+                    }
+                    
+                    // Vérifier la validité de la date
+                    const monthNum = parseInt(month);
+                    const dayNum = parseInt(day);
+                    if (monthNum >= 1 && monthNum <= 12 && dayNum >= 1 && dayNum <= 31) {
+                        detectedDate = `${year}-${month}-${day}`;
+                    }
                 } else {
-                    // Format DD/MM/YY
-                    day = match[1].padStart(2, '0');
-                    month = match[2].padStart(2, '0');
-                    year = '20' + match[3];
+                    // Formats avec mois en lettres
+                    const day = match[1].padStart(2, '0');
+                    const monthText = match[2].toLowerCase();
+                    const month = monthMap[monthText];
+                    const year = match[3].length === 2 ? '20' + match[3] : match[3];
+                    
+                    if (month) {
+                        detectedDate = `${year}-${month}-${day}`;
+                    }
                 }
-                detectedDate = `${year}-${month}-${day}`;
-                break;
+                
+                if (detectedDate) break;
             }
         }
         if (detectedDate) break;
@@ -312,25 +367,44 @@ window.analyzeReceiptText = function(text) {
     // 3. Détecter le montant total
     let totalAmount = 0;
     const amountPatterns = [
-        /TOTAL[\s:]*([0-9]+[,.]?[0-9]*)/i,
-        /MONTANT[\s:]*([0-9]+[,.]?[0-9]*)/i,
-        /A PAYER[\s:]*([0-9]+[,.]?[0-9]*)/i,
-        /ESPECES[\s:]*([0-9]+[,.]?[0-9]*)/i,
-        /CB[\s:]*([0-9]+[,.]?[0-9]*)/i,
-        /€[\s]*([0-9]+[,.]?[0-9]*)/,
-        /([0-9]+[,.]?[0-9]*)[\s]*€/,
-        /([0-9]+[,.]?[0-9]*)[\s]*EUR/i
+        /TOTAL[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /MONTANT[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /A\s+PAYER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /NET\s+A\s+PAYER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /ESPECES[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /CB[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /€\s*([0-9]+[,.]?[0-9]*)/,
+        /([0-9]+[,.]?[0-9]*)\s*€/,
+        /([0-9]+[,.]?[0-9]*)\s*EUR/i
     ];
     
-    // Chercher le montant le plus élevé (probablement le total)
+    // Collecter tous les montants trouvés
     let amounts = [];
     for (let line of lines) {
-        for (let pattern of amountPatterns) {
-            const matches = line.matchAll(new RegExp(pattern, 'g'));
+        // Chercher spécifiquement les lignes de total
+        if (/TOTAL|MONTANT|PAYER|ESPECES|CB/i.test(line)) {
+            for (let pattern of amountPatterns) {
+                const match = line.match(pattern);
+                if (match) {
+                    const amountStr = match[1].replace(',', '.');
+                    const amount = parseFloat(amountStr);
+                    if (!isNaN(amount) && amount > 0) {
+                        amounts.push(amount);
+                        console.log('Montant trouvé dans ligne de total:', amount, 'depuis:', line);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Si pas de montant trouvé dans les lignes de total, chercher tous les montants
+    if (amounts.length === 0) {
+        for (let line of lines) {
+            const matches = line.matchAll(/([0-9]+[,.]?[0-9]*)\s*€?/g);
             for (let match of matches) {
                 const amountStr = match[1].replace(',', '.');
                 const amount = parseFloat(amountStr);
-                if (!isNaN(amount) && amount > 0) {
+                if (!isNaN(amount) && amount > 0 && amount < 10000) {
                     amounts.push(amount);
                 }
             }
@@ -340,32 +414,41 @@ window.analyzeReceiptText = function(text) {
     // Prendre le montant le plus élevé comme total
     if (amounts.length > 0) {
         totalAmount = Math.max(...amounts);
+        console.log('Montant total détecté:', totalAmount);
     }
     
-    // 4. Extraire les articles (lignes avec des prix)
+    // 4. Extraire les articles
     const items = [];
-    const itemPattern = /^(.+?)\s+([0-9]+[,.]?[0-9]*)\s*€?$/;
-    const simpleItemPattern = /([0-9]+[,.]?[0-9]*)\s*€/;
+    const itemPatterns = [
+        /^(.+?)\s+([0-9]+[,.]?[0-9]*)\s*€?$/,
+        /^(.+?)\s+€?\s*([0-9]+[,.]?[0-9]*)$/,
+        /([0-9]+[,.]?[0-9]*)\s*€/
+    ];
     
     for (let line of lines) {
-        // Ignorer les lignes de total
-        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS.TOTAL/i.test(line)) continue;
+        // Ignorer les lignes de total et informations
+        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI/i.test(line)) {
+            continue;
+        }
         
-        const match = line.match(itemPattern);
-        if (match) {
-            const name = match[1].trim();
-            const price = parseFloat(match[2].replace(',', '.'));
-            if (name && !isNaN(price) && price > 0 && price < totalAmount) {
-                items.push({ name, price });
-            }
-        } else if (simpleItemPattern.test(line)) {
-            // Ligne avec juste un prix
-            const priceMatch = line.match(simpleItemPattern);
-            if (priceMatch) {
-                const price = parseFloat(priceMatch[1].replace(',', '.'));
-                const name = line.replace(simpleItemPattern, '').trim();
-                if (name && !isNaN(price) && price > 0 && price < totalAmount) {
+        // Essayer de détecter un article avec prix
+        let found = false;
+        for (let pattern of itemPatterns) {
+            const match = line.match(pattern);
+            if (match) {
+                let name, price;
+                if (match.length === 3) {
+                    name = match[1].trim();
+                    price = parseFloat(match[2].replace(',', '.'));
+                } else {
+                    price = parseFloat(match[1].replace(',', '.'));
+                    name = line.replace(pattern, '').trim();
+                }
+                
+                if (name && !isNaN(price) && price > 0 && price < totalAmount && name.length > 2) {
                     items.push({ name, price });
+                    found = true;
+                    break;
                 }
             }
         }
@@ -374,7 +457,7 @@ window.analyzeReceiptText = function(text) {
     // Remplir les champs
     document.getElementById('detectedStore').value = storeName;
     document.getElementById('detectedDate').value = detectedDate;
-    document.getElementById('detectedAmount').value = totalAmount.toFixed(2);
+    document.getElementById('detectedAmount').value = totalAmount > 0 ? totalAmount.toFixed(2) : '';
     
     // Afficher les articles détectés
     const itemsContainer = document.getElementById('detectedItems');
@@ -385,6 +468,15 @@ window.analyzeReceiptText = function(text) {
                 <span style="font-weight: 600;">${item.price.toFixed(2)}€</span>
             </div>
         `).join('');
+        
+        // Calculer et afficher le sous-total des articles
+        const itemsTotal = items.reduce((sum, item) => sum + item.price, 0);
+        itemsContainer.innerHTML += `
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem 0 0; margin-top: 0.5rem; border-top: 2px solid var(--primary); font-weight: 600;">
+                <span>Sous-total articles:</span>
+                <span>${itemsTotal.toFixed(2)}€</span>
+            </div>
+        `;
     } else {
         itemsContainer.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem;">Aucun article détecté - Entrez le montant total manuellement</div>';
     }
@@ -440,7 +532,8 @@ window.addScannedExpense = function() {
             name: description,
             amount: amount,
             participants: participants,
-            date: date || new Date().toISOString()
+            date: date || new Date().toISOString(),
+            scanned: true
         });
     } else {
         // Dépense individuelle
@@ -463,7 +556,24 @@ window.addScannedExpense = function() {
     if (typeof window.showSuccessMessage === 'function') {
         window.showSuccessMessage('Ticket ajouté avec succès !');
     } else {
-        alert('Ticket ajouté avec succès !');
+        // Créer un message de succès simple
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #10b981;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+        `;
+        toast.textContent = 'Ticket ajouté avec succès !';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
     }
 };
 
