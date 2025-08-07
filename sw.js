@@ -11,10 +11,6 @@ const urlsToCache = [
   '/images/icon-512.png',
   '/images/icon-192-maskable.png',
   '/images/icon-512-maskable.png',
-   // Scripts JavaScript
-  '/js/pdf-export.js',
-  '/js/ocr-scanner.js',
-  '/js/security.js',
   'https://fonts.googleapis.com/icon?family=Material+Icons'
 ];
 
