@@ -446,6 +446,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 }
 
+function updatePinButtonText() {
+    const btn = document.getElementById('pinButtonText');
+    if (btn) {
+        btn.textContent = (appData.security && appData.security.pinEnabled)
+            ? 'Désactiver le code PIN'
+            : 'Activer le code PIN';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    updatePinButtonText();
+});
     // Fonctions de rendu
     function renderApp() {
         renderTabs();
@@ -1768,15 +1780,6 @@ function togglePinSecurity() {
         document.getElementById('pinError').style.display = 'none';
         openModal('pinModal');
     }
-	
-	// Mettre à jour le texte du bouton PIN dans les paramètres
-function updatePinButtonText() {
-    const btn = document.getElementById('pinButtonText');
-    if (btn) {
-        btn.textContent = (appData.security && appData.security.pinEnabled) ? 
-            'Désactiver le code PIN' : 'Activer le code PIN';
-    }
-}
 }
 
 </script>
