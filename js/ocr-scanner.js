@@ -427,38 +427,58 @@ window.analyzeReceiptText = function(text) {
     
     // Collecter tous les montants trouvés
     let amounts = [];
+    let reglementAmount = 0;
+    
     for (let line of lines) {
-        // Chercher spécifiquement les lignes de total ou règlement
-        if (/TOTAL|MONTANT|PAYER|REGLER|REGLEMENT|ESPECES|CB|CHEQUE/i.test(line)) {
-            // Chercher un montant dans cette ligne
-            // Pattern spécial pour les montants avec virgule sans espace (31,8)
-            const specialMatch = line.match(/([0-9]+),([0-9]{1,2})(?!\d)/);
-            if (specialMatch) {
-                const euros = specialMatch[1];
-                let cents = specialMatch[2];
+        // Chercher spécifiquement la ligne de règlement avec le montant réel payé
+        if (/REGLEMENT|CHEQUE|ESPECES|CB|CARTE/i.test(line)) {
+            // Pattern pour "Règlement Chèque 31,8"
+            const reglementMatch = line.match(/([0-9]+),([0-9]{1,2})(?:\s|$)/);
+            if (reglementMatch) {
+                const euros = reglementMatch[1];
+                let cents = reglementMatch[2];
                 // Si un seul chiffre après la virgule, c'est des dizaines de centimes
                 if (cents.length === 1) {
                     cents = cents + '0';
                 }
-                const amount = parseFloat(euros + '.' + cents);
-                if (!isNaN(amount) && amount > 0 && amount < 1000) {
-                    amounts.push(amount);
-                    console.log('Montant spécial trouvé:', amount, 'depuis:', line);
-                }
-            } else {
-                // Patterns standards
-                for (let pattern of amountPatterns) {
-                    const match = line.match(pattern);
-                    if (match) {
-                        const amount = parseAmount(match[1]);
-                        if (!isNaN(amount) && amount > 0 && amount < 1000) {
-                            amounts.push(amount);
-                            console.log('Montant trouvé dans ligne de total:', amount, 'depuis:', line);
-                        }
+                reglementAmount = parseFloat(euros + '.' + cents);
+                console.log('Montant règlement trouvé:', reglementAmount, 'depuis:', line);
+                amounts.push(reglementAmount);
+            }
+        }
+        
+        // Chercher les totaux
+        if (/TOTAL|MONTANT|PAYER|REGLER(?!MENT)/i.test(line)) {
+            for (let pattern of amountPatterns) {
+                const match = line.match(pattern);
+                if (match) {
+                    const amount = parseAmount(match[1]);
+                    if (!isNaN(amount) && amount > 0 && amount < 1000) {
+                        amounts.push(amount);
+                        console.log('Montant trouvé dans ligne de total:', amount, 'depuis:', line);
                     }
                 }
             }
         }
+    }
+    
+    // Si on a trouvé un montant de règlement, l'utiliser en priorité
+    if (reglementAmount > 0 && reglementAmount < 1000) {
+        totalAmount = reglementAmount;
+        console.log('Utilisation du montant de règlement comme total:', totalAmount);
+    } else if (amounts.length > 0) {
+        // Filtrer les montants aberrants
+        const reasonableAmounts = amounts.filter(a => a < 1000);
+        if (reasonableAmounts.length > 0) {
+            // Prendre le montant le plus petit qui semble raisonnable (souvent le bon total)
+            totalAmount = Math.min(...reasonableAmounts.filter(a => a > 10));
+            if (isNaN(totalAmount) || totalAmount === Infinity) {
+                totalAmount = Math.max(...reasonableAmounts);
+            }
+        } else {
+            totalAmount = Math.min(...amounts);
+        }
+        console.log('Montant total détecté:', totalAmount);
     }
     
     // Si pas de montant trouvé dans les lignes de total, chercher tous les montants
@@ -597,6 +617,8 @@ window.addScannedExpense = function() {
     const amount = parseFloat(document.getElementById('detectedAmount').value);
     const assignTo = document.getElementById('assignToUser').value;
     
+    console.log('Ajout dépense - Store:', store, 'Amount:', amount, 'AssignTo:', assignTo);
+    
     if (!store) {
         alert('Veuillez entrer le nom du magasin');
         return;
@@ -615,11 +637,23 @@ window.addScannedExpense = function() {
     // Créer la description de la dépense
     const description = `${store} - Ticket scanné`;
     
-    // S'assurer que window.appData existe
-    if (!window.appData) {
-        alert('Erreur: Les données de l\'application ne sont pas accessibles');
+    // Récupérer appData depuis le scope global ou parent
+    let data = window.appData;
+    if (!data && window.parent && window.parent.appData) {
+        data = window.parent.appData;
+    }
+    if (!data && typeof appData !== 'undefined') {
+        data = appData;
+        window.appData = appData; // Exposer globalement
+    }
+    
+    if (!data) {
+        alert('Erreur: Les données de l\'application ne sont pas accessibles. Rechargez la page.');
+        console.error('appData non trouvé');
         return;
     }
+    
+    console.log('appData trouvé:', data);
     
     if (assignTo === 'commun') {
         // Dépense commune
@@ -633,54 +667,92 @@ window.addScannedExpense = function() {
             return;
         }
         
-        if (!window.appData.commonExpenses) {
-            window.appData.commonExpenses = [];
+        if (!data.commonExpenses) {
+            data.commonExpenses = [];
         }
         
-        window.appData.commonExpenses.push({
+        data.commonExpenses.push({
             name: description,
             amount: amount,
             participants: participants,
             date: date || new Date().toISOString(),
             scanned: true
         });
+        
+        console.log('Dépense commune ajoutée:', data.commonExpenses);
     } else {
         // Dépense individuelle
-        if (!window.appData.users[assignTo]) {
+        if (!data.users || !data.users[assignTo]) {
             alert('Erreur: Utilisateur non trouvé');
+            console.error('Utilisateur non trouvé:', assignTo, 'dans', data.users);
             return;
         }
         
-        if (!window.appData.users[assignTo].expenses) {
-            window.appData.users[assignTo].expenses = [];
+        if (!data.users[assignTo].expenses) {
+            data.users[assignTo].expenses = [];
         }
         
-        window.appData.users[assignTo].expenses.push({
+        const newExpense = {
             name: description,
             amount: amount,
             date: date || new Date().toISOString(),
             scanned: true
-        });
+        };
+        
+        data.users[assignTo].expenses.push(newExpense);
+        console.log('Dépense ajoutée à', data.users[assignTo].name, ':', newExpense);
+        console.log('Total des dépenses de', data.users[assignTo].name, ':', data.users[assignTo].expenses);
     }
     
-    // Sauvegarder et rafraîchir
+    // Sauvegarder
+    window.appData = data; // S'assurer que c'est global
+    
+    // Essayer plusieurs méthodes de sauvegarde
+    let saved = false;
+    
+    // Méthode 1: saveData global
     if (typeof window.saveData === 'function') {
         window.saveData();
-    } else {
-        // Essayer de sauvegarder directement dans localStorage
-        localStorage.setItem('expenseTrackerData', JSON.stringify(window.appData));
+        saved = true;
+        console.log('Sauvegarde via window.saveData()');
+    } 
+    // Méthode 2: saveData dans le parent
+    else if (window.parent && typeof window.parent.saveData === 'function') {
+        window.parent.saveData();
+        saved = true;
+        console.log('Sauvegarde via window.parent.saveData()');
+    }
+    // Méthode 3: Direct localStorage
+    else {
+        try {
+            localStorage.setItem('expenseTrackerData', JSON.stringify(data));
+            saved = true;
+            console.log('Sauvegarde directe dans localStorage');
+        } catch (e) {
+            console.error('Erreur de sauvegarde:', e);
+        }
     }
     
+    if (!saved) {
+        alert('Erreur lors de la sauvegarde. Vérifiez la console.');
+        return;
+    }
+    
+    // Rafraîchir l'affichage
     if (typeof window.renderApp === 'function') {
         window.renderApp();
+    } else if (window.parent && typeof window.parent.renderApp === 'function') {
+        window.parent.renderApp();
     }
     
     // Fermer le modal
     window.closeScanModal();
     
     // Message de succès
+    const message = `Ticket de ${amount.toFixed(2)}€ ajouté ${assignTo === 'commun' ? 'aux dépenses communes' : 'à ' + data.users[assignTo].name} !`;
+    
     if (typeof window.showSuccessMessage === 'function') {
-        window.showSuccessMessage('Ticket ajouté avec succès !');
+        window.showSuccessMessage(message);
     } else {
         // Créer un message de succès simple
         const toast = document.createElement('div');
@@ -695,9 +767,8 @@ window.addScannedExpense = function() {
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             z-index: 10000;
-            animation: slideIn 0.3s ease;
         `;
-        toast.textContent = 'Ticket ajouté avec succès !';
+        toast.textContent = message;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
     }
