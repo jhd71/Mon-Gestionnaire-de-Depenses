@@ -228,20 +228,6 @@
 }
 
 #scanModal .modal-footer button {
-    background: var(--primary-gradient);
-    color: white;
-    border: none;
-    padding: 0.625rem 1.25rem;
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 600;
-    transition: all var(--transition-fast);
-    display: inline-flex;
-    gap: 0.5rem;
-    position: relative;
-    overflow: hidden;
-    box-shadow: var(--shadow);
     justify-content: space-evenly;
 }
 
