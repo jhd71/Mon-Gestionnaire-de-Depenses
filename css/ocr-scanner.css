@@ -227,7 +227,7 @@
     font-style: italic;
 }
 
-.btn {
+#scanModal .modal-content.btn {
     background: var(--primary-gradient);
     color: white;
     border: none;
