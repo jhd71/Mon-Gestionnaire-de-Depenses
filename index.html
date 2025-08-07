@@ -230,14 +230,20 @@
             Installer l'application
         </button>
         
+        <!-- NOUVEAU BOUTON SCANNER -->
+        <button class="btn" onclick="scanReceipt()" style="background-color: #10b981;">
+            <span class="material-icons">document_scanner</span>
+            Scanner un ticket de caisse
+        </button>
+        
         <button class="btn" onclick="exportData()">
             <span class="material-icons">download</span>
             Exporter les données
         </button>
-		<button class="btn" onclick="exportToPDF()">
-			<span class="material-icons">picture_as_pdf</span>
-			Exporter en PDF
-		</button>
+        <button class="btn" onclick="exportToPDF()">
+            <span class="material-icons">picture_as_pdf</span>
+            Exporter en PDF
+        </button>
         <button class="btn" onclick="importData()">
             <span class="material-icons">upload</span>
             Importer des données
@@ -1553,6 +1559,23 @@ function showSuccessMessage(message) {
         setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
+
+// Fonction wrapper pour le scanner OCR
+function scanReceipt() {
+    if (typeof window.scanReceiptOCR === 'function') {
+        window.scanReceiptOCR();
+    } else {
+        alert('Le module de scan est en cours de chargement. Veuillez réessayer dans quelques secondes.');
+    }
+}
+
+// Exposer les fonctions nécessaires globalement (à ajouter dans DOMContentLoaded)
+window.appData = appData;
+window.saveData = saveData;
+window.renderApp = renderApp;
+window.closeModal = closeModal;
+window.openModal = openModal;
+
 </script>
 	<!-- Popup de donation -->
 <div id="donationPopup" class="donation-overlay" style="display: none;">
@@ -1572,5 +1595,6 @@ function showSuccessMessage(message) {
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/pdf-export.js"></script>
+<script src="js/ocr-scanner.js"></script>
 </body>
 </html>
