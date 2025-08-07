@@ -234,6 +234,10 @@
             <span class="material-icons">download</span>
             Exporter les données
         </button>
+		<button class="btn" onclick="exportToPDF()">
+			<span class="material-icons">picture_as_pdf</span>
+			Exporter en PDF
+		</button>
         <button class="btn" onclick="importData()">
             <span class="material-icons">upload</span>
             Importer des données
@@ -1566,5 +1570,7 @@ function showSuccessMessage(message) {
         </p>
     </div>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/pdf-export.js"></script>
 </body>
 </html>
