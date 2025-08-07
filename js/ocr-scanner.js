@@ -119,12 +119,7 @@ window.scanReceiptOCR = function() {
                         <div>
                             <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Attribuer à :</label>
                             <select id="assignToUser" class="input">
-                                <option value="">Choisir...</option>
-                                <option value="commun">🏠 Dépense commune</option>
-                                ${Object.entries(window.appData.users || {})
-                                    .filter(([id]) => id !== 'commun')
-                                    .map(([id, user]) => `<option value="${id}">👤 ${user.name}</option>`)
-                                    .join('')}
+                                <!-- Options ajoutées dynamiquement -->
                             </select>
                         </div>
                         
@@ -151,6 +146,19 @@ window.scanReceiptOCR = function() {
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
     
+    // Remplir le select des utilisateurs
+    const assignSelect = document.getElementById('assignToUser');
+    let optionsHTML = '<option value="">Choisir...</option>';
+    optionsHTML += '<option value="commun">🏠 Dépense commune</option>';
+    
+    // Ajouter les utilisateurs (sauf commun)
+    const users = Object.entries(window.appData.users || {}).filter(([id]) => id !== 'commun');
+    users.forEach(([id, user]) => {
+        optionsHTML += `<option value="${id}">👤 ${user.name}</option>`;
+    });
+    
+    assignSelect.innerHTML = optionsHTML;
+    
     // Ajouter l'animation CSS pour le spinner si elle n'existe pas
     if (!document.getElementById('spinnerStyle')) {
         const style = document.createElement('style');
@@ -164,7 +172,6 @@ window.scanReceiptOCR = function() {
     }
     
     // Gérer le changement d'attribution
-    const assignSelect = document.getElementById('assignToUser');
     assignSelect.addEventListener('change', function() {
         const commonParticipants = document.getElementById('commonParticipants');
         const participantsCheckboxes = document.getElementById('participantsCheckboxes');
@@ -406,7 +413,9 @@ window.analyzeReceiptText = function(text) {
     const amountPatterns = [
         /TOTAL[\s:]*FACTURE[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /TOTAL[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
-        /MONTANT[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /MONTANT[\s:]*TOTAL[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /A\s+REGLER[\s:]*TTC[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /A\s+REGLER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /A\s+PAYER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /NET\s+A\s+PAYER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /REGLEMENT[\s:]*.*?([0-9]+[,.]?[0-9]*)/i,
@@ -464,14 +473,19 @@ window.analyzeReceiptText = function(text) {
     
     // Patterns pour détecter les articles avec prix
     const itemPatterns = [
-        /^(.+?)\s+([0-9]+[,.]?[0-9]*)\s*€?\s*\d*$/,  // Article prix €
-        /^(.+?)\s+([0-9]+[,.]?[0-9]*)\s+\d+$/,        // Article prix quantité
-        /^\d+\s+(.+?)\s+([0-9]+[,.]?[0-9]*)/,         // Quantité Article prix
+        // Format: Article prix,décimal
+        /^(.+?)\s+(\d+),(\d{2})\s*$/,
+        // Format: Article prix.décimal
+        /^(.+?)\s+(\d+)\.(\d{2})\s*$/,
+        // Format: Article prix (sans décimales)
+        /^(.+?)\s+(\d+)\s*$/,
+        // Format avec code: 166-1-Article prix
+        /^\d+[-\s]\d+[-\s](.+?)\s+(\d+[,.]?\d*)/,
     ];
     
     for (let line of lines) {
         // Ignorer les lignes d'en-tête et de pied
-        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI|SIRET|TEL|FACTURE|CLIENT|ADRESSE|COMMANDE|CREE PAR|LIVRER|ARTICLES/i.test(line)) {
+        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI|SIRET|TEL|FACTURE|CLIENT|ADRESSE|COMMANDE|CREE PAR|LIVRER|ARTICLES|GRATUIT|RECEPTION|LIVRAISON|REGLEMENT|DONT|CODE|AVOIR/i.test(line)) {
             continue;
         }
         
@@ -482,34 +496,41 @@ window.analyzeReceiptText = function(text) {
         for (let pattern of itemPatterns) {
             const match = line.match(pattern);
             if (match) {
-                let name, priceStr;
+                let name, price;
                 
-                // Extraire le nom et le prix selon le pattern
-                if (pattern.source.startsWith('^\\d+\\s+')) {
-                    // Format: Quantité Article Prix
+                if (pattern.source.includes('\\d+[-\\s]\\d+[-\\s]')) {
+                    // Format avec code au début
                     name = match[1].trim();
-                    priceStr = match[2];
+                    price = parseAmount(match[2]);
+                } else if (match.length === 4) {
+                    // Format avec virgule séparée
+                    name = match[1].trim();
+                    price = parseFloat(match[2] + '.' + match[3]);
+                } else if (match.length === 3) {
+                    name = match[1].trim();
+                    price = parseAmount(match[2]);
                 } else {
-                    // Format: Article Prix
-                    name = match[1].trim();
-                    priceStr = match[2];
+                    continue;
                 }
                 
-                // Parser le prix
-                const price = parseAmount(priceStr);
+                // Nettoyer le nom
+                name = name.replace(/^[T\d]+[-\s]+/, '').trim();
                 
                 // Vérifier que le prix est raisonnable
-                if (name && !isNaN(price) && price > 0 && price < 500) {
-                    // Nettoyer le nom (enlever les indicateurs de quantité, etc.)
-                    name = name.replace(/^\d+\s+/, '').replace(/\s+\d+$/, '').trim();
-                    
-                    // Ignorer si le nom ressemble à un code ou est trop court
-                    if (name.length > 2 && !/^[A-Z0-9]+$/.test(name)) {
+                if (name && !isNaN(price) && price > 0 && price < 500 && name.length > 2) {
+                    // Ignorer si le nom ressemble à un code pur
+                    if (!/^[A-Z0-9\-]+$/.test(name) || name.includes('-')) {
+                        // Pour les noms avec tiret, prendre la partie après
+                        if (name.includes('-')) {
+                            const parts = name.split('-');
+                            name = parts[parts.length - 1].trim();
+                        }
+                        
                         items.push({ name, price });
                         console.log('Article détecté:', name, price);
-                        break;
                     }
                 }
+                break;
             }
         }
     }
