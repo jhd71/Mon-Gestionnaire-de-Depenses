@@ -290,14 +290,7 @@
         currentTab: 'dashboard',
         theme: 'dark'
     };
-// Mettre à jour le texte du bouton PIN dans les paramètres
-function updatePinButtonText() {
-    const btn = document.getElementById('pinButtonText');
-    if (btn) {
-        btn.textContent = (appData.security && appData.security.pinEnabled) ? 
-            'Désactiver le code PIN' : 'Activer le code PIN';
-    }
-}
+
     // Variables globales
     let currentUser = '';
     let calcExpression = '0';
@@ -461,7 +454,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCommonTab();
 		updatePinButtonText();
     }
-
+// Mettre à jour le texte du bouton PIN dans les paramètres
+function updatePinButtonText() {
+    const btn = document.getElementById('pinButtonText');
+    if (btn) {
+        btn.textContent = (appData.security && appData.security.pinEnabled) ? 
+            'Désactiver le code PIN' : 'Activer le code PIN';
+    }
+}
     function renderTabs() {
         const tabsContainer = document.getElementById('tabs');
         tabsContainer.innerHTML = `
