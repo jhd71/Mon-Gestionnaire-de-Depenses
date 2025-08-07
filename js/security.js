@@ -184,16 +184,6 @@ function togglePinSecurity() {
         
         openModal('pinModal');
     }
-	
-	// Mettre à jour le texte du bouton PIN dans les paramètres
-function updatePinButtonText() {
-    const btn = document.getElementById('pinButtonText');
-    if (btn) {
-        btn.textContent = (appData.security && appData.security.pinEnabled)
-            ? 'Désactiver le code PIN'
-            : 'Activer le code PIN';
-    }
-}
 
 }
 
