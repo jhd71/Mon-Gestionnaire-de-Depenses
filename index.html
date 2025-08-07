@@ -229,11 +229,18 @@
             <span class="material-icons">install_mobile</span>
             Installer l'application
         </button>
-        
+        <button class="btn" onclick="togglePinSecurity()">
+			<span class="material-icons">lock</span>
+			<span id="pinButtonText">Activer le code PIN</span>
+		</button>
         <button class="btn" onclick="exportData()">
             <span class="material-icons">download</span>
             Exporter les données
         </button>
+		<button class="btn" onclick="exportToPDF()">
+			<span class="material-icons">picture_as_pdf</span>
+			Exporter en PDF
+		</button>
         <button class="btn" onclick="importData()">
             <span class="material-icons">upload</span>
             Importer des données
@@ -292,7 +299,7 @@
     let sessionStart = Date.now();
 
     // Initialisation
-    document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     // Appliquer le thème sauvegardé ou celui déjà défini par le script du head
     const preferredTheme = localStorage.getItem('preferredTheme') || 
                           document.body.getAttribute('data-theme') || 
@@ -310,16 +317,16 @@
         saveData();
     }
     
-    loadData();
-	syncTheme();
+    initSecurity();
+    syncTheme();
     initPWA();
     renderApp();
     initDonation();
-        
-        // Masquer le FAB au démarrage si on est sur le tableau de bord
-        if (appData.currentTab === 'dashboard') {
-            document.getElementById('fabButton').style.display = 'none';
-        }
+    
+    // Masquer le FAB au démarrage si on est sur le tableau de bord
+    if (appData.currentTab === 'dashboard') {
+        document.getElementById('fabButton').style.display = 'none';
+    }
         
         // Surcharge de exportData pour le tracking
         const originalExportData = exportData;
@@ -445,6 +452,7 @@
         renderDashboard();
         renderUserTabs();
         renderCommonTab();
+		updatePinButtonText();
     }
 
     function renderTabs() {
@@ -1549,6 +1557,219 @@ function showSuccessMessage(message) {
         setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
+
+// ========== SYSTÈME DE SÉCURITÉ PIN ==========
+let currentPin = '';
+let isSettingPin = false;
+let pinAttempts = 0;
+const MAX_ATTEMPTS = 3;
+
+// Initialiser la sécurité au démarrage
+function initSecurity() {
+    if (appData.security && appData.security.pinEnabled && appData.security.pin) {
+        // Bloquer l'accès jusqu'à la saisie du PIN
+        showPinScreen();
+    }
+}
+
+// Afficher l'écran de PIN
+function showPinScreen() {
+    currentPin = '';
+    updatePinDisplay();
+    
+    const modal = document.getElementById('pinModal');
+    modal.classList.add('active');
+    modal.style.zIndex = '100000';
+    
+    document.getElementById('pinTitle').textContent = 'Entrez votre code PIN';
+    document.getElementById('pinError').style.display = 'none';
+    
+    // Bloquer toute l'interface
+    document.body.style.pointerEvents = 'none';
+    modal.style.pointerEvents = 'auto';
+}
+
+// Ajouter un chiffre au PIN
+function addPinDigit(digit) {
+    if (currentPin.length < 4) {
+        currentPin += digit;
+        updatePinDisplay();
+        
+        // Vibration tactile
+        if (navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+        
+        // Vérification automatique à 4 chiffres
+        if (currentPin.length === 4) {
+            setTimeout(submitPin, 200);
+        }
+    }
+}
+
+// Effacer le PIN
+function clearPin() {
+    currentPin = '';
+    updatePinDisplay();
+    document.getElementById('pinError').style.display = 'none';
+}
+
+// Mettre à jour l'affichage du PIN
+function updatePinDisplay() {
+    const display = document.getElementById('pinDisplay');
+    let displayText = '';
+    
+    for (let i = 0; i < 4; i++) {
+        if (i < currentPin.length) {
+            displayText += '●';
+        } else {
+            displayText += '○';
+        }
+    }
+    
+    display.textContent = displayText;
+}
+
+// Soumettre le PIN
+function submitPin() {
+    if (currentPin.length !== 4) {
+        shakePin();
+        return;
+    }
+    
+    if (isSettingPin) {
+        // Définir un nouveau PIN
+        appData.security = appData.security || {};
+        appData.security.pin = hashPin(currentPin);
+        appData.security.pinEnabled = true;
+        saveData();
+        
+        showSuccessMessage('Code PIN défini avec succès !');
+        document.body.style.pointerEvents = '';
+        closeModal('pinModal');
+        isSettingPin = false;
+    } else {
+        // Vérifier le PIN
+        if (verifyPin(currentPin)) {
+            // PIN correct
+            document.body.style.pointerEvents = '';
+            closeModal('pinModal');
+            pinAttempts = 0;
+            
+            // Démarrer le timer d'inactivité
+            startInactivityTimer();
+        } else {
+            // PIN incorrect
+            pinAttempts++;
+            shakePin();
+            currentPin = '';
+            updatePinDisplay();
+            
+            const errorDiv = document.getElementById('pinError');
+            errorDiv.style.display = 'block';
+            
+            if (pinAttempts >= MAX_ATTEMPTS) {
+                errorDiv.textContent = 'Trop de tentatives. Réinitialisation...';
+                setTimeout(() => {
+                    localStorage.clear();
+                    location.reload();
+                }, 2000);
+            } else {
+                errorDiv.textContent = `PIN incorrect. ${MAX_ATTEMPTS - pinAttempts} tentative(s) restante(s)`;
+            }
+        }
+    }
+}
+
+// Hacher le PIN
+function hashPin(pin) {
+    let hash = 0;
+    for (let i = 0; i < pin.length; i++) {
+        const char = pin.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash).toString();
+}
+
+// Vérifier le PIN
+function verifyPin(pin) {
+    return hashPin(pin) === appData.security.pin;
+}
+
+// Animation de secousse
+function shakePin() {
+    const modal = document.querySelector('#pinModal .modal-content');
+    modal.style.animation = 'shake 0.5s';
+    setTimeout(() => {
+        modal.style.animation = '';
+    }, 500);
+}
+
+// Timer d'inactivité
+let inactivityTimer;
+
+function startInactivityTimer() {
+    clearTimeout(inactivityTimer);
+    
+    if (!appData.security || !appData.security.pinEnabled) return;
+    
+    inactivityTimer = setTimeout(() => {
+        showPinScreen();
+    }, 5 * 60 * 1000); // 5 minutes
+}
+
+// Réinitialiser le timer sur activité
+document.addEventListener('click', startInactivityTimer);
+document.addEventListener('keypress', startInactivityTimer);
+document.addEventListener('touchstart', startInactivityTimer);
+
+// Activer/Désactiver le PIN
+function togglePinSecurity() {
+    if (appData.security && appData.security.pinEnabled) {
+        // Désactiver - demander le PIN actuel
+        document.getElementById('pinTitle').textContent = 'Entrez le PIN actuel pour désactiver';
+        currentPin = '';
+        updatePinDisplay();
+        isSettingPin = false;
+        
+        // Modifier temporairement submitPin
+        const originalSubmit = window.submitPin;
+        window.submitPin = function() {
+            if (currentPin.length !== 4) {
+                shakePin();
+                return;
+            }
+            
+            if (verifyPin(currentPin)) {
+                appData.security.pinEnabled = false;
+                appData.security.pin = null;
+                saveData();
+                showSuccessMessage('Code PIN désactivé');
+                document.body.style.pointerEvents = '';
+                closeModal('pinModal');
+                window.submitPin = originalSubmit;
+            } else {
+                shakePin();
+                currentPin = '';
+                updatePinDisplay();
+                document.getElementById('pinError').style.display = 'block';
+                document.getElementById('pinError').textContent = 'PIN incorrect';
+            }
+        };
+        
+        showPinScreen();
+    } else {
+        // Activer - définir nouveau PIN
+        isSettingPin = true;
+        currentPin = '';
+        updatePinDisplay();
+        document.getElementById('pinTitle').textContent = 'Définir un code PIN (4 chiffres)';
+        document.getElementById('pinError').style.display = 'none';
+        openModal('pinModal');
+    }
+}
+
 </script>
 	<!-- Popup de donation -->
 <div id="donationPopup" class="donation-overlay" style="display: none;">
@@ -1564,6 +1785,38 @@ function showSuccessMessage(message) {
         <p style="margin-top: 1rem; font-size: 0.875rem; opacity: 0.7;">
             Merci de votre soutien ! ❤️
         </p>
+    </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/pdf-export.js"></script>
+<script src="js/security.js"></script>
+<!-- Modal de sécurité PIN -->
+<div class="modal" id="pinModal">
+    <div class="modal-content" style="max-width: 350px;">
+        <div class="modal-header">
+            <span class="material-icons" style="margin-right: 0.5rem;">lock</span>
+            <span id="pinTitle">Entrez votre code PIN</span>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+            <div id="pinDisplay" style="font-size: 2rem; letter-spacing: 1rem; margin: 1rem 0;">
+                ○○○○
+            </div>
+            <div id="pinError" style="color: var(--danger); font-size: 0.875rem; margin-bottom: 1rem; display: none;"></div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; max-width: 200px; margin: 0 auto;">
+                <button class="pin-btn" onclick="addPinDigit(1)">1</button>
+                <button class="pin-btn" onclick="addPinDigit(2)">2</button>
+                <button class="pin-btn" onclick="addPinDigit(3)">3</button>
+                <button class="pin-btn" onclick="addPinDigit(4)">4</button>
+                <button class="pin-btn" onclick="addPinDigit(5)">5</button>
+                <button class="pin-btn" onclick="addPinDigit(6)">6</button>
+                <button class="pin-btn" onclick="addPinDigit(7)">7</button>
+                <button class="pin-btn" onclick="addPinDigit(8)">8</button>
+                <button class="pin-btn" onclick="addPinDigit(9)">9</button>
+                <button class="pin-btn" onclick="clearPin()">C</button>
+                <button class="pin-btn" onclick="addPinDigit(0)">0</button>
+                <button class="pin-btn" onclick="submitPin()">✓</button>
+            </div>
+        </div>
     </div>
 </div>
 </body>
