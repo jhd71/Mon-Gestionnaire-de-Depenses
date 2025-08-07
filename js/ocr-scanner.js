@@ -29,12 +29,19 @@ window.scanReceiptOCR = function() {
     modal.style.zIndex = '10000';
     
     modal.innerHTML = `
-        <div class="modal-content" style="max-width: 800px;">
-            <div class="modal-header">
-                <span class="material-icons" style="margin-right: 0.5rem;">document_scanner</span>
-                Scanner un ticket de caisse
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="position: sticky; top: 0; background: var(--bg-secondary); z-index: 10; padding: 1rem; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center;">
+                        <span class="material-icons" style="margin-right: 0.5rem;">document_scanner</span>
+                        Scanner un ticket de caisse
+                    </div>
+                    <button onclick="window.closeScanModal()" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="padding-bottom: 80px;">
                 <!-- Zone de sélection de fichier -->
                 <div id="scanUploadArea" style="
                     border: 2px dashed var(--primary);
@@ -54,7 +61,7 @@ window.scanReceiptOCR = function() {
                 
                 <!-- Aperçu de l'image -->
                 <div id="imagePreview" style="display: none; margin-bottom: 1rem;">
-                    <img id="previewImg" style="max-width: 100%; max-height: 400px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <img id="previewImg" style="max-width: 100%; max-height: 300px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 </div>
                 
                 <!-- Zone de progression -->
@@ -138,7 +145,7 @@ window.scanReceiptOCR = function() {
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-secondary); border-top: 1px solid var(--border); padding: 1rem; display: flex; justify-content: flex-end; gap: 1rem; z-index: 10;">
                 <button class="btn btn-danger" onclick="window.closeScanModal()">Annuler</button>
                 <button id="addScannedExpense" class="btn" style="display: none;" onclick="window.addScannedExpense()">
                     <span class="material-icons">add</span>
@@ -366,29 +373,47 @@ window.analyzeReceiptText = function(text) {
     
     // 3. Détecter le montant total
     let totalAmount = 0;
+    
+    // Fonction pour parser les montants français (virgule = décimale, espace/point = milliers)
+    function parseAmount(str) {
+        // Nettoyer la chaîne
+        str = str.trim();
+        // Remplacer les espaces (séparateurs de milliers)
+        str = str.replace(/\s/g, '');
+        // Si on a un point ET une virgule, le point est pour les milliers
+        if (str.includes('.') && str.includes(',')) {
+            str = str.replace('.', '');
+            str = str.replace(',', '.');
+        } else if (str.includes(',')) {
+            // Virgule seule = décimale en France
+            str = str.replace(',', '.');
+        }
+        return parseFloat(str);
+    }
+    
     const amountPatterns = [
+        /TOTAL[\s:]*FACTURE[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /TOTAL[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /MONTANT[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /A\s+PAYER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /NET\s+A\s+PAYER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /REGLEMENT[\s:]*.*?([0-9]+[,.]?[0-9]*)/i,
         /ESPECES[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /CB[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
         /€\s*([0-9]+[,.]?[0-9]*)/,
-        /([0-9]+[,.]?[0-9]*)\s*€/,
-        /([0-9]+[,.]?[0-9]*)\s*EUR/i
+        /([0-9]+[,.]?[0-9]*)\s*€/
     ];
     
     // Collecter tous les montants trouvés
     let amounts = [];
     for (let line of lines) {
         // Chercher spécifiquement les lignes de total
-        if (/TOTAL|MONTANT|PAYER|ESPECES|CB/i.test(line)) {
+        if (/TOTAL|MONTANT|PAYER|REGLEMENT|ESPECES|CB/i.test(line)) {
             for (let pattern of amountPatterns) {
                 const match = line.match(pattern);
                 if (match) {
-                    const amountStr = match[1].replace(',', '.');
-                    const amount = parseFloat(amountStr);
-                    if (!isNaN(amount) && amount > 0) {
+                    const amount = parseAmount(match[1]);
+                    if (!isNaN(amount) && amount > 0 && amount < 10000) {
                         amounts.push(amount);
                         console.log('Montant trouvé dans ligne de total:', amount, 'depuis:', line);
                     }
@@ -402,18 +427,23 @@ window.analyzeReceiptText = function(text) {
         for (let line of lines) {
             const matches = line.matchAll(/([0-9]+[,.]?[0-9]*)\s*€?/g);
             for (let match of matches) {
-                const amountStr = match[1].replace(',', '.');
-                const amount = parseFloat(amountStr);
-                if (!isNaN(amount) && amount > 0 && amount < 10000) {
+                const amount = parseAmount(match[1]);
+                if (!isNaN(amount) && amount > 0 && amount < 1000) {
                     amounts.push(amount);
                 }
             }
         }
     }
     
-    // Prendre le montant le plus élevé comme total
+    // Prendre le montant le plus élevé comme total (mais raisonnable)
     if (amounts.length > 0) {
-        totalAmount = Math.max(...amounts);
+        // Filtrer les montants aberrants (> 1000€ pour un ticket standard)
+        const reasonableAmounts = amounts.filter(a => a < 1000);
+        if (reasonableAmounts.length > 0) {
+            totalAmount = Math.max(...reasonableAmounts);
+        } else {
+            totalAmount = Math.min(...amounts); // Si tous > 1000, prendre le plus petit
+        }
         console.log('Montant total détecté:', totalAmount);
     }
     
@@ -427,7 +457,7 @@ window.analyzeReceiptText = function(text) {
     
     for (let line of lines) {
         // Ignorer les lignes de total et informations
-        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI/i.test(line)) {
+        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI|SIRET|TEL|FACTURE/i.test(line)) {
             continue;
         }
         
@@ -439,13 +469,14 @@ window.analyzeReceiptText = function(text) {
                 let name, price;
                 if (match.length === 3) {
                     name = match[1].trim();
-                    price = parseFloat(match[2].replace(',', '.'));
+                    price = parseAmount(match[2]);
                 } else {
-                    price = parseFloat(match[1].replace(',', '.'));
+                    price = parseAmount(match[1]);
                     name = line.replace(pattern, '').trim();
                 }
                 
-                if (name && !isNaN(price) && price > 0 && price < totalAmount && name.length > 2) {
+                // Vérifier que le prix est raisonnable (< 500€ pour un article)
+                if (name && !isNaN(price) && price > 0 && price < 500 && name.length > 2) {
                     items.push({ name, price });
                     found = true;
                     break;
