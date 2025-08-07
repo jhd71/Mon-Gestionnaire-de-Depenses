@@ -131,15 +131,8 @@ window.scanReceiptOCR = function() {
                         <!-- Si dépense commune, sélection des participants -->
                         <div id="commonParticipants" style="display: none;">
                             <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Participants :</label>
-                            <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 0.75rem;">
-                                ${Object.entries(window.appData.users || {})
-                                    .filter(([id]) => id !== 'commun')
-                                    .map(([id, user]) => `
-                                        <div style="margin-bottom: 0.5rem;">
-                                            <input type="checkbox" id="participant_scan_${id}" value="${id}" checked>
-                                            <label for="participant_scan_${id}">${user.name}</label>
-                                        </div>
-                                    `).join('')}
+                            <div id="participantsCheckboxes" style="background: var(--bg-tertiary); border-radius: 8px; padding: 0.75rem;">
+                                <!-- Les participants seront ajoutés dynamiquement -->
                             </div>
                         </div>
                     </div>
@@ -174,8 +167,26 @@ window.scanReceiptOCR = function() {
     const assignSelect = document.getElementById('assignToUser');
     assignSelect.addEventListener('change', function() {
         const commonParticipants = document.getElementById('commonParticipants');
+        const participantsCheckboxes = document.getElementById('participantsCheckboxes');
+        
         if (this.value === 'commun') {
+            // Afficher et remplir les participants
             commonParticipants.style.display = 'block';
+            
+            // Générer les checkboxes des participants
+            const users = Object.entries(window.appData.users || {})
+                .filter(([id]) => id !== 'commun');
+            
+            if (users.length > 0) {
+                participantsCheckboxes.innerHTML = users.map(([id, user]) => `
+                    <div style="margin-bottom: 0.5rem;">
+                        <input type="checkbox" id="participant_scan_${id}" value="${id}" checked>
+                        <label for="participant_scan_${id}">${user.name}</label>
+                    </div>
+                `).join('');
+            } else {
+                participantsCheckboxes.innerHTML = '<div style="color: var(--text-secondary);">Aucun utilisateur disponible. Créez d\'abord des utilisateurs.</div>';
+            }
         } else {
             commonParticipants.style.display = 'none';
         }
@@ -376,8 +387,9 @@ window.analyzeReceiptText = function(text) {
     
     // Fonction pour parser les montants français (virgule = décimale, espace/point = milliers)
     function parseAmount(str) {
+        if (!str) return 0;
         // Nettoyer la chaîne
-        str = str.trim();
+        str = str.toString().trim();
         // Remplacer les espaces (séparateurs de milliers)
         str = str.replace(/\s/g, '');
         // Si on a un point ET une virgule, le point est pour les milliers
@@ -449,37 +461,54 @@ window.analyzeReceiptText = function(text) {
     
     // 4. Extraire les articles
     const items = [];
+    
+    // Patterns pour détecter les articles avec prix
     const itemPatterns = [
-        /^(.+?)\s+([0-9]+[,.]?[0-9]*)\s*€?$/,
-        /^(.+?)\s+€?\s*([0-9]+[,.]?[0-9]*)$/,
-        /([0-9]+[,.]?[0-9]*)\s*€/
+        /^(.+?)\s+([0-9]+[,.]?[0-9]*)\s*€?\s*\d*$/,  // Article prix €
+        /^(.+?)\s+([0-9]+[,.]?[0-9]*)\s+\d+$/,        // Article prix quantité
+        /^\d+\s+(.+?)\s+([0-9]+[,.]?[0-9]*)/,         // Quantité Article prix
     ];
     
     for (let line of lines) {
-        // Ignorer les lignes de total et informations
-        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI|SIRET|TEL|FACTURE/i.test(line)) {
+        // Ignorer les lignes d'en-tête et de pied
+        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI|SIRET|TEL|FACTURE|CLIENT|ADRESSE|COMMANDE|CREE PAR|LIVRER|ARTICLES/i.test(line)) {
             continue;
         }
         
+        // Ignorer les lignes trop courtes
+        if (line.length < 3) continue;
+        
         // Essayer de détecter un article avec prix
-        let found = false;
         for (let pattern of itemPatterns) {
             const match = line.match(pattern);
             if (match) {
-                let name, price;
-                if (match.length === 3) {
+                let name, priceStr;
+                
+                // Extraire le nom et le prix selon le pattern
+                if (pattern.source.startsWith('^\\d+\\s+')) {
+                    // Format: Quantité Article Prix
                     name = match[1].trim();
-                    price = parseAmount(match[2]);
+                    priceStr = match[2];
                 } else {
-                    price = parseAmount(match[1]);
-                    name = line.replace(pattern, '').trim();
+                    // Format: Article Prix
+                    name = match[1].trim();
+                    priceStr = match[2];
                 }
                 
-                // Vérifier que le prix est raisonnable (< 500€ pour un article)
-                if (name && !isNaN(price) && price > 0 && price < 500 && name.length > 2) {
-                    items.push({ name, price });
-                    found = true;
-                    break;
+                // Parser le prix
+                const price = parseAmount(priceStr);
+                
+                // Vérifier que le prix est raisonnable
+                if (name && !isNaN(price) && price > 0 && price < 500) {
+                    // Nettoyer le nom (enlever les indicateurs de quantité, etc.)
+                    name = name.replace(/^\d+\s+/, '').replace(/\s+\d+$/, '').trim();
+                    
+                    // Ignorer si le nom ressemble à un code ou est trop court
+                    if (name.length > 2 && !/^[A-Z0-9]+$/.test(name)) {
+                        items.push({ name, price });
+                        console.log('Article détecté:', name, price);
+                        break;
+                    }
                 }
             }
         }

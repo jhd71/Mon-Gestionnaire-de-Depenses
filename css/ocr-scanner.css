@@ -1,0 +1,255 @@
+/* ocr-scanner.css - Styles pour le module Scanner OCR */
+
+/* Modal Scanner */
+#scanModal .modal-content {
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* Header fixe du modal */
+#scanModal .modal-header {
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary);
+    z-index: 10;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Bouton de fermeture */
+#scanModal .close-button {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s;
+}
+
+#scanModal .close-button:hover {
+    opacity: 0.7;
+}
+
+/* Body avec padding pour le footer fixe */
+#scanModal .modal-body {
+    padding-bottom: 80px;
+}
+
+/* Footer fixe */
+#scanModal .modal-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    padding: 1rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    z-index: 10;
+}
+
+/* Zone d'upload */
+#scanUploadArea {
+    border: 2px dashed var(--primary);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 1rem;
+}
+
+#scanUploadArea:hover {
+    background: var(--bg-secondary);
+    border-color: var(--primary-hover);
+}
+
+/* Aperçu de l'image */
+#previewImg {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: block;
+    margin: 0 auto;
+}
+
+/* Zone de progression */
+#scanProgress {
+    margin-bottom: 1rem;
+}
+
+.scan-progress-container {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.scan-progress-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Spinner animé */
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Barre de progression */
+.progress-bar-container {
+    margin-top: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+}
+
+#progressBar {
+    height: 100%;
+    background: var(--primary);
+    width: 0%;
+    transition: width 0.3s;
+}
+
+/* Section de debug repliable */
+#scanResults details {
+    margin-bottom: 1rem;
+}
+
+#scanResults summary {
+    cursor: pointer;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    user-select: none;
+}
+
+#scanResults summary:hover {
+    color: var(--primary);
+}
+
+#extractedText {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    resize: vertical;
+}
+
+/* Articles détectés */
+#detectedItems {
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+
+.detected-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.detected-item:last-child {
+    border-bottom: none;
+}
+
+.detected-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detected-item-price {
+    font-weight: 600;
+    margin-left: 1rem;
+}
+
+/* Sous-total */
+.items-subtotal {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0 0;
+    margin-top: 0.5rem;
+    border-top: 2px solid var(--primary);
+    font-weight: 600;
+}
+
+/* Section participants */
+#participantsCheckboxes {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+
+#participantsCheckboxes > div {
+    margin-bottom: 0.5rem;
+}
+
+#participantsCheckboxes > div:last-child {
+    margin-bottom: 0;
+}
+
+#participantsCheckboxes input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+/* Message d'erreur */
+.empty-participants {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Responsive mobile */
+@media (max-width: 768px) {
+    #scanModal .modal-content {
+        max-width: 100%;
+        width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    #scanUploadArea {
+        padding: 1.5rem;
+    }
+    
+    #previewImg {
+        max-height: 200px;
+    }
+    
+    #scanModal .modal-footer {
+        flex-direction: column;
+    }
+    
+    #scanModal .modal-footer button {
+        width: 100%;
+    }
+}
