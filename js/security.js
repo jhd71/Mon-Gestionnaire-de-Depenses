@@ -184,8 +184,19 @@ function togglePinSecurity() {
         
         openModal('pinModal');
     }
+updatePinButtonText(); // 🔁 mettre à jour le texte du bouton après activation/désactivation
 
 }
+
+function updatePinButtonText() {
+    const btn = document.getElementById('pinButtonText');
+    if (btn) {
+        btn.textContent = (appData.security && appData.security.pinEnabled)
+            ? 'Désactiver le code PIN'
+            : 'Activer le code PIN';
+    }
+}
+
 
 // Ajouter le style pour l'animation shake
 const pinStyle = document.createElement('style');
