@@ -870,7 +870,6 @@ window.recalculateTotal = function() {
         alert('Aucun article pour calculer le total');
     }
 };
-};
 
 // Ajouter la dépense scannée
 window.addScannedExpense = function() {
