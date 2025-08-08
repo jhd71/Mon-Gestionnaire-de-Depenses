@@ -650,3 +650,4 @@ window.analyzeReceiptText = function(text) {
             }
         }
     }
+	 }
