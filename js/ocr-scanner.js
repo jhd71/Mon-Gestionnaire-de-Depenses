@@ -355,54 +355,82 @@ window.analyzeReceiptText = function(text) {
     // Nettoyer et préparer les lignes
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     
-    // 1. Détecter le nom du magasin - AMÉLIORÉ
+    // 1. Détecter le nom du magasin - VERSION UNIVERSELLE
     let storeName = '';
     
-    // Pour ce ticket spécifique, chercher "ACE" ou l'adresse
-    const storePatterns = [
-        /^ACE\b/i,
-        /CARREFOUR|LECLERC|AUCHAN|LIDL|ALDI|INTERMARCHE|SUPER U|MONOPRIX|FRANPRIX|CASINO|CORA|MATCH/i,
-        /BOULANGERIE|PHARMACIE|TABAC|RESTAURANT|CAFE|BRASSERIE|PIZZERIA|KEBAB/i,
-    ];
+    // Le nom du magasin est généralement dans les 5 premières lignes
+    // On cherche la première ligne significative qui n'est pas une adresse ou info administrative
+    for (let i = 0; i < Math.min(10, lines.length); i++) {
+        const line = lines[i].trim();
+        
+        // Ignorer les lignes vides ou trop courtes
+        if (line.length < 2) continue;
+        
+        // Ignorer les lignes qui sont clairement des adresses ou infos admin
+        if (/^\d{1,5}\s+(rue|avenue|boulevard|place|chemin|route)/i.test(line)) continue;
+        if (/^(tel|tél|téléphone|fax|email|e-mail|web|www|http)/i.test(line)) continue;
+        if (/^(siret|siren|rcs|ape|tva|n°\s*tva)/i.test(line)) continue;
+        if (/^\d{5}\s+[A-Z]/i.test(line)) continue; // Code postal + ville
+        if (/^[\d\s\-\.]+$/i.test(line)) continue; // Que des chiffres
+        
+        // Si c'est une ligne en MAJUSCULES au début du ticket, c'est probablement le nom
+        if (i < 3 && line === line.toUpperCase() && /^[A-Z]/.test(line) && line.length < 50) {
+            storeName = line.split(/\s{2,}/)[0]; // Prendre la première partie si espaces multiples
+            console.log('Nom du magasin trouvé (MAJUSCULES):', storeName);
+            break;
+        }
+        
+        // Si c'est la première ligne non administrative
+        if (/^[A-Za-z][A-Za-z\s&\-'\.]+$/.test(line) && line.length < 40) {
+            storeName = line;
+            console.log('Nom du magasin trouvé (première ligne valide):', storeName);
+            break;
+        }
+    }
     
-    // Chercher ACE spécifiquement (dernière ligne du ticket)
-    const aceLineIndex = lines.findIndex(line => /ACE\s+vous\s+remercie/i.test(line));
-    if (aceLineIndex >= 0) {
-        storeName = 'ACE';
-    } else {
-        // Chercher dans les premières lignes (éviter adresse et SIRET)
-        for (let i = 0; i < Math.min(5, lines.length); i++) {
-            const line = lines[i];
-            
-            // Ignorer les lignes d'adresse et administratives
-            if (/avenue|rue|boulevard|siret|tel|tél|^\d{5}/i.test(line)) continue;
-            
-            // Si c'est la première ligne significative
-            if (!storeName && line.length > 2 && line.length < 30) {
-                storeName = line;
+    // Si toujours pas trouvé, chercher après "FACTURE" ou dans la ligne de remerciement
+    if (!storeName) {
+        // Chercher dans les lignes de remerciement (souvent à la fin)
+        for (let line of lines) {
+            const mercMatch = line.match(/^([A-Z][A-Za-z\s&]+)\s+vous\s+remercie/i);
+            if (mercMatch) {
+                storeName = mercMatch[1].trim();
+                console.log('Nom trouvé dans remerciement:', storeName);
                 break;
             }
         }
     }
     
+    // Si toujours pas trouvé, prendre la première ligne non vide significative
     if (!storeName) {
-        storeName = 'ACE'; // Valeur par défaut pour ce ticket
+        for (let line of lines) {
+            if (line.length > 2 && line.length < 30 && /^[A-Z]/.test(line) && !/\d{3,}/.test(line)) {
+                storeName = line;
+                console.log('Nom par défaut (première ligne valide):', storeName);
+                break;
+            }
+        }
     }
     
-    // 2. Détecter la date - AMÉLIORÉ
+    // Valeur par défaut
+    if (!storeName) {
+        storeName = 'Magasin';
+    }
+    
+    // 2. Détecter la date - AMÉLIORÉ POUR TOUS TYPES DE TICKETS
     let detectedDate = '';
     
     // Chercher différents formats de date
     const datePatterns = [
-        /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/,  // DD/MM/YYYY
+        /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/,  // DD/MM/YYYY ou DD-MM-YYYY
         /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})/,   // DD/MM/YY
         /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/,   // YYYY-MM-DD
         /(\d{2})(\d{2})(\d{4})/                     // DDMMYYYY (comme 16022007)
     ];
     
     for (let line of lines) {
-        // Chercher spécifiquement "Réception" ou "Livraison" avec date
-        if (/réception|livraison/i.test(line)) {
+        // Chercher les dates dans différents contextes
+        if (/date|le\s+\d|réception|livraison|livrer/i.test(line)) {
             for (let pattern of datePatterns) {
                 const match = line.match(pattern);
                 if (match) {
@@ -427,61 +455,135 @@ window.analyzeReceiptText = function(text) {
                         // Format DD/MM/YY
                         day = match[1].padStart(2, '0');
                         month = match[2].padStart(2, '0');
-                        year = '20' + match[3];
+                        year = parseInt(match[3]) > 50 ? '19' + match[3] : '20' + match[3];
                     }
                     
-                    detectedDate = `${year}-${month}-${day}`;
-                    break;
+                    // Vérifier la validité
+                    const monthNum = parseInt(month);
+                    const dayNum = parseInt(day);
+                    if (monthNum >= 1 && monthNum <= 12 && dayNum >= 1 && dayNum <= 31) {
+                        detectedDate = `${year}-${month}-${day}`;
+                        console.log('Date trouvée:', detectedDate);
+                        break;
+                    }
                 }
             }
         }
         if (detectedDate) break;
     }
     
-    // Pour ce ticket: 18/02/2007
+    // Si pas trouvé, chercher dans tout le texte (format moins strict)
     if (!detectedDate) {
-        detectedDate = '2007-02-18';
+        for (let line of lines) {
+            for (let pattern of datePatterns) {
+                const match = line.match(pattern);
+                if (match) {
+                    let day, month, year;
+                    
+                    if (match[3] && match[3].length === 4) {
+                        day = match[1].padStart(2, '0');
+                        month = match[2].padStart(2, '0');
+                        year = match[3];
+                    } else if (match[1] && match[1].length === 4) {
+                        year = match[1];
+                        month = match[2].padStart(2, '0');
+                        day = match[3].padStart(2, '0');
+                    } else {
+                        day = match[1].padStart(2, '0');
+                        month = match[2].padStart(2, '0');
+                        year = parseInt(match[3]) > 50 ? '19' + match[3] : '20' + match[3];
+                    }
+                    
+                    const monthNum = parseInt(month);
+                    const dayNum = parseInt(day);
+                    if (monthNum >= 1 && monthNum <= 12 && dayNum >= 1 && dayNum <= 31) {
+                        detectedDate = `${year}-${month}-${day}`;
+                        console.log('Date trouvée (recherche élargie):', detectedDate);
+                        break;
+                    }
+                }
+            }
+            if (detectedDate) break;
+        }
     }
     
-    // 3. Détecter le montant total - CORRIGÉ POUR LES MONTANTS FRANÇAIS
+    // Si toujours pas de date, utiliser aujourd'hui
+    if (!detectedDate) {
+        detectedDate = new Date().toISOString().split('T')[0];
+        console.log('Date par défaut (aujourd\'hui):', detectedDate);
+    }
+    
+    // 3. Détecter le montant total - VERSION UNIVERSELLE
     let totalAmount = 0;
     
-    // Chercher le montant dans les lignes de total et règlement
+    // Chercher le montant dans différents formats
     const totalPatterns = [
-        /Total\s+Facture\s+([0-9]+(?:[,.]?\d{1,2})?)/i,
-        /Règlement\s+(?:Chèque|Espèces|CB)\s+([0-9]+[,.]?\d{1,2})/i,
-        /TOTAL[:\s]+([0-9]+[,.]?\d{1,2})/i,
-        /MONTANT[:\s]+([0-9]+[,.]?\d{1,2})/i
+        // Patterns avec mots-clés français
+        /(?:TOTAL|MONTANT)\s*(?:TOTAL)?\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i,
+        /A\s+(?:REGLER|PAYER)\s*(?:TTC)?\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i,
+        /NET\s+A\s+PAYER\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i,
+        /SOUS[\s\-]?TOTAL\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i,
+        /REGLEMENT\s+(?:CHEQUE|ESPECES|CB|CARTE)\s*:?\s*([0-9]+[,.]?\d{0,2})/i,
+        // Patterns avec symbole euro
+        /([0-9]+[,.]?\d{0,2})\s*€\s*$/,
+        /€\s*([0-9]+[,.]?\d{0,2})\s*$/,
+        // Pattern pour "Total Facture 318" (mal lu)
+        /Total\s+Facture\s+(\d+)/i
     ];
     
+    // Collecter tous les montants trouvés
+    const amounts = [];
+    
     for (let line of lines) {
-        // Cas spécifique : "Total Facture 318" qui est en réalité 31,8 ou 31,80
-        if (/Total\s+Facture/i.test(line)) {
-            const match = line.match(/(\d+)/);
+        // Ignorer les lignes de TVA et pourcentages
+        if (/TVA|%|pourcentage|remise|reduction|points/i.test(line) && !/total/i.test(line)) {
+            continue;
+        }
+        
+        // Chercher avec tous les patterns
+        for (let pattern of totalPatterns) {
+            const match = line.match(pattern);
             if (match) {
                 let amount = match[1];
-                // Si c'est 318, c'est probablement 31,8 mal lu
-                if (amount === '318') {
-                    totalAmount = 31.80;
-                    console.log('Montant corrigé: 318 -> 31.80€');
-                } else if (amount.length === 3 && parseInt(amount) > 100) {
-                    // Autres cas similaires: 582 -> 58.2, etc.
-                    totalAmount = parseInt(amount) / 10;
-                    console.log(`Montant corrigé: ${amount} -> ${totalAmount}€`);
-                } else {
-                    totalAmount = window.parseFrenchAmount(amount);
+                
+                // Correction spéciale pour les montants mal lus (318 -> 31.8)
+                if (/^\d{3,}$/.test(amount) && parseInt(amount) > 100) {
+                    // Si c'est un nombre à 3 chiffres sans virgule/point, c'est probablement XX,X mal lu
+                    const corrected = parseInt(amount) / 10;
+                    console.log(`Montant corrigé: ${amount} -> ${corrected}€`);
+                    amount = corrected.toString();
+                }
+                
+                const parsedAmount = window.parseFrenchAmount(amount);
+                if (parsedAmount > 0 && parsedAmount < 10000) {
+                    amounts.push(parsedAmount);
+                    console.log('Montant trouvé:', parsedAmount, 'depuis:', line);
                 }
             }
         }
-        // Cas du règlement : "Règlement Chèque 31,8"
-        else if (/Règlement/i.test(line)) {
-            const match = line.match(/([0-9]+)[,.](\d{1,2})/);
-            if (match) {
-                totalAmount = window.parseFrenchAmount(match[0]);
-                console.log('Montant règlement trouvé:', totalAmount);
-                break; // Le règlement est le montant le plus fiable
-            }
-        }
+    }
+    
+    // Sélectionner le montant le plus probable
+    if (amounts.length > 0) {
+        // Préférer les montants qui apparaissent plusieurs fois
+        const countMap = {};
+        amounts.forEach(a => {
+            const key = a.toFixed(2);
+            countMap[key] = (countMap[key] || 0) + 1;
+        });
+        
+        // Trouver le montant le plus fréquent
+        const mostFrequent = Object.keys(countMap).reduce((a, b) => 
+            countMap[a] > countMap[b] ? a : b
+        );
+        
+        totalAmount = parseFloat(mostFrequent);
+        console.log('Montant total sélectionné:', totalAmount);
+    }
+    
+    // Si pas de montant trouvé, essayer de calculer depuis les articles (sera fait plus tard)
+    if (totalAmount === 0) {
+        console.log('Aucun montant total trouvé - sera calculé depuis les articles');
     }
     
     // 4. Extraire les articles - VERSION COMPLÈTEMENT CORRIGÉE
