@@ -394,11 +394,6 @@ window.analyzeReceiptText = function(text) {
     };
     
     for (let line of lines) {
-        // Ignorer les lignes qui contiennent des mots-clés non pertinents pour les dates
-        if (/RECEPTION|LIVRAISON|FACTURE|COMMANDE/i.test(line) && !/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(line)) {
-            continue;
-        }
-        
         for (let i = 0; i < datePatterns.length; i++) {
             const match = line.match(datePatterns[i]);
             if (match) {
@@ -451,203 +446,608 @@ window.analyzeReceiptText = function(text) {
         detectedDate = new Date().toISOString().split('T')[0];
     }
     
-    // 3. Détecter le montant total - AMÉLIORATION
+    // 3. Détecter le montant total
     let totalAmount = 0;
     
-    // Fonction améliorée pour parser les montants français
+    // Fonction pour parser les montants français (virgule = décimale, espace/point = milliers)
     function parseAmount(str) {
         if (!str) return 0;
         // Nettoyer la chaîne
         str = str.toString().trim();
         // Remplacer les espaces (séparateurs de milliers)
         str = str.replace(/\s/g, '');
-        
-        // Détecter le format français (virgule pour décimale)
-        // Si on a des chiffres puis virgule puis exactement 1 ou 2 chiffres, c'est une décimale
-        const frenchDecimalMatch = str.match(/^(\d+),(\d{1,2})$/);
-        if (frenchDecimalMatch) {
-            const euros = frenchDecimalMatch[1];
-            let cents = frenchDecimalMatch[2];
-            // Si un seul chiffre après la virgule, c'est des dizaines de centimes
-            if (cents.length === 1) {
-                cents = cents + '0';
-            }
-            return parseFloat(euros + '.' + cents);
-        }
-        
-        // Si on a point ET virgule, le point est pour les milliers
+        // Si on a un point ET une virgule, le point est pour les milliers
         if (str.includes('.') && str.includes(',')) {
-            str = str.replace(/\./g, '');
+            str = str.replace('.', '');
             str = str.replace(',', '.');
         } else if (str.includes(',')) {
             // Virgule seule = décimale en France
             str = str.replace(',', '.');
         }
-        
         return parseFloat(str);
     }
     
-    // Patterns améliorés pour les montants
-    const totalPatterns = [
-        /MONTANT\s+TOTAL\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i,
-        /TOTAL\s+FACTURE\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i,
-        /TOTAL\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i,
-        /A\s+REGLER\s+[A-Z]*\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i,
-        /NET\s+A\s+PAYER\s*:?\s*([0-9]+[,.]?\d{0,2})\s*€?/i
+    const amountPatterns = [
+        /TOTAL[\s:]*FACTURE[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /TOTAL[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /MONTANT[\s:]*TOTAL[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /A\s+REGLER[\s:]*TTC[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /A\s+REGLER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /A\s+PAYER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /NET\s+A\s+PAYER[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /REGLEMENT[\s:]*.*?([0-9]+[,.]?[0-9]*)/i,
+        /ESPECES[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /CB[\s:]*€?\s*([0-9]+[,.]?[0-9]*)/i,
+        /€\s*([0-9]+[,.]?[0-9]*)/,
+        /([0-9]+[,.]?[0-9]*)\s*€/
     ];
     
-    // Chercher spécifiquement les lignes de total
+    // Collecter tous les montants trouvés
+    let amounts = [];
+    let reglementAmount = 0;
+    
     for (let line of lines) {
-        if (/TOTAL|REGLER|PAYER/i.test(line) && !/SOUS[\s\-]?TOTAL/i.test(line)) {
-            for (let pattern of totalPatterns) {
-                const match = line.match(pattern);
-                if (match) {
-                    const amount = parseAmount(match[1]);
-                    if (!isNaN(amount) && amount > 0 && amount < 10000) {
-                        totalAmount = amount;
-                        console.log('Montant total trouvé:', amount, 'depuis:', line);
-                        break;
-                    }
-                }
-            }
-            if (totalAmount > 0) break;
-        }
-    }
-    
-    // Si pas trouvé, chercher dans les lignes de règlement
-    if (totalAmount === 0) {
-        for (let line of lines) {
-            if (/REGLEMENT|CHEQUE|ESPECES|CB|CARTE/i.test(line)) {
-                const amountMatch = line.match(/([0-9]+),?(\d{0,2})\s*€?/);
-                if (amountMatch) {
-                    const amount = parseAmount(amountMatch[0]);
-                    if (!isNaN(amount) && amount > 0 && amount < 10000) {
-                        totalAmount = amount;
-                        console.log('Montant règlement trouvé:', amount, 'depuis:', line);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    
-    // 4. Extraire les articles - AMÉLIORATION
-    const items = [];
-    
-    // Mots-clés à exclure absolument (ne peuvent pas être des articles)
-    const excludeKeywords = [
-        /^(TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI)/i,
-        /^(SIRET|TEL|FAX|FACTURE|CLIENT|ADRESSE|COMMANDE|CREE\s+PAR|LIVRER|ARTICLES)/i,
-        /^(GRATUIT|RECEPTION|LIVRAISON|REGLEMENT|DONT|CODE|RCS|N°\s*TVA|POINTS|CUMUL)/i,
-        /^(AVOIR|REMISE|REDUCTION|CARTE|CHEQUE|VIREMENT|PAIEMENT)/i,
-        /^(EMAIL|WEB|SITE|WWW|HTTP)/i,
-        /^\d{1,2}[\/\-\.]\d{1,2}/,  // Dates
-        /^\d{1,2}:\d{2}/,  // Heures
-        /^[A-Z]{2,}\s*:/, // Labels en majuscules suivis de :
-        /^A\s+(LIVRER|REGLER)/i,  // "A LIVRER", "A REGLER"
-        /^LE\s+\d{1,2}/i,  // "LE 24/03/2016"
-    ];
-    
-    // Pattern amélioré pour détecter les articles
-    // On cherche d'abord les lignes qui ressemblent à des articles avec prix
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        
-        // Ignorer les lignes exclues
-        let isExcluded = false;
-        for (let exclude of excludeKeywords) {
-            if (exclude.test(line)) {
-                isExcluded = true;
-                break;
-            }
-        }
-        if (isExcluded) continue;
-        
-        // Ignorer les lignes trop courtes ou qui sont juste des chiffres
-        if (line.length < 3 || /^\d+$/.test(line.trim())) continue;
-        
-        // Pattern principal: texte suivi d'un prix
-        // Amélioration: on cherche aussi les lignes avec quantité
-        const itemPatterns = [
-            // Format: "1 Article 12.00" ou "Article 12.00"
-            /^(?:\d+\s+)?(.+?)\s+(\d+)[,.](\d{2})\s*(?:€|\d)?$/,
-            // Format: "Article 12,00 €"
-            /^(?:\d+\s+)?(.+?)\s+(\d+),(\d{2})\s*€?$/,
-            // Format: "Article 12.00"
-            /^(?:\d+\s+)?(.+?)\s+(\d+)\.(\d{2})$/,
-            // Format simple avec virgule: "Article 12,5"
-            /^(?:\d+\s+)?(.+?)\s+(\d+),(\d{1})$/
-        ];
-        
-        let itemFound = false;
-        for (let pattern of itemPatterns) {
-            const match = line.match(pattern);
-            if (match) {
-                let name = match[1].trim();
-                let euros = match[2];
-                let cents = match[3] || '00';
-                
-                // Si un seul chiffre après la virgule, c'est des dizaines
+        // Chercher spécifiquement la ligne de règlement avec le montant réel payé
+        if (/REGLEMENT|CHEQUE|ESPECES|CB|CARTE/i.test(line)) {
+            // Pattern pour "Règlement Chèque 31,8"
+            const reglementMatch = line.match(/([0-9]+),([0-9]{1,2})(?:\s|$)/);
+            if (reglementMatch) {
+                const euros = reglementMatch[1];
+                let cents = reglementMatch[2];
+                // Si un seul chiffre après la virgule, c'est des dizaines de centimes
                 if (cents.length === 1) {
                     cents = cents + '0';
                 }
-                
-                const price = parseFloat(euros + '.' + cents);
-                
-                // Nettoyer le nom
-                // Enlever les caractères spéciaux au début
-                name = name.replace(/^[\|\-\+\*\/\.\s]+/, '');
-                // Enlever les codes produits (ex: "T66-i-Veste" devient "Veste")
-                name = name.replace(/^[A-Z]?\d+[\-\s]*[A-Z]?\d*[\-\s]*/, '');
-                // Si le nom commence par un seul caractère puis un espace, le supprimer
-                name = name.replace(/^[a-z]\s+/i, '');
-                
-                // Vérifications finales
-                if (name.length < 2) continue;
-                if (isNaN(price) || price <= 0 || price > 500) continue;
-                
-                // Ignorer si c'est manifestement pas un article
-                if (/^(QT|REF|CODE|NUM|N°)/i.test(name)) continue;
-                
-                items.push({ 
-                    name: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(), 
-                    price: price 
-                });
-                console.log('Article détecté:', name, price);
-                itemFound = true;
-                break;
+                reglementAmount = parseFloat(euros + '.' + cents);
+                console.log('Montant règlement trouvé:', reglementAmount, 'depuis:', line);
+                amounts.push(reglementAmount);
             }
         }
         
-        // Si pas trouvé avec les patterns stricts, essayer une détection plus souple
-        // mais seulement dans la zone probable des articles (milieu du ticket)
-        if (!itemFound && i > 5 && i < lines.length - 10) {
-            // Vérifier si la ligne suivante contient un prix seul
-            if (i + 1 < lines.length) {
-                const nextLine = lines[i + 1];
-                const priceMatch = nextLine.match(/^(\d+)[,.](\d{1,2})\s*€?$/);
-                if (priceMatch && line.length > 2 && /[a-zA-Z]/.test(line)) {
-                    let name = line.trim();
-                    let cents = priceMatch[2];
-                    if (cents.length === 1) cents = cents + '0';
-                    const price = parseFloat(priceMatch[1] + '.' + cents);
-                    
-                    if (price > 0 && price < 500 && !excludeKeywords.some(k => k.test(name))) {
-                        // Nettoyer le nom
-                        name = name.replace(/^[\|\-\+\*\/\.\s]+/, '');
-                        name = name.replace(/^[A-Z]?\d+[\-\s]*[A-Z]?\d*[\-\s]*/, '');
-                        
-                        if (name.length >= 2) {
-                            items.push({ 
-                                name: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(), 
-                                price: price 
-                            });
-                            console.log('Article détecté (2 lignes):', name, price);
-                            i++; // Sauter la ligne suivante
+        // Chercher les totaux
+        if (/TOTAL|MONTANT|PAYER|REGLER(?!MENT)/i.test(line)) {
+            // Pattern pour les montants standards (58.10 ou 58,10)
+            const standardMatch = line.match(/([0-9]+)[,.]([0-9]{2})\s*€?/);
+            if (standardMatch) {
+                const amount = parseFloat(standardMatch[1] + '.' + standardMatch[2]);
+                if (!isNaN(amount) && amount > 0 && amount < 1000) {
+                    amounts.push(amount);
+                    console.log('Montant trouvé dans ligne de total:', amount, 'depuis:', line);
+                }
+            } else {
+                // Essayer les autres patterns
+                for (let pattern of amountPatterns) {
+                    const match = line.match(pattern);
+                    if (match) {
+                        const amount = parseAmount(match[1]);
+                        if (!isNaN(amount) && amount > 0 && amount < 1000) {
+                            amounts.push(amount);
+                            console.log('Montant trouvé dans ligne de total:', amount, 'depuis:', line);
                         }
                     }
                 }
             }
         }
     }
-	}
+    
+    // Si on a trouvé un montant de règlement, l'utiliser en priorité
+    if (reglementAmount > 0 && reglementAmount < 1000) {
+        totalAmount = reglementAmount;
+        console.log('Utilisation du montant de règlement comme total:', totalAmount);
+    } else if (amounts.length > 0) {
+        // Prendre le montant le plus fréquent ou le plus petit raisonnable
+        const reasonableAmounts = amounts.filter(a => a > 5 && a < 500);
+        if (reasonableAmounts.length > 0) {
+            // Compter les occurrences
+            const counts = {};
+            reasonableAmounts.forEach(a => {
+                const key = a.toFixed(2);
+                counts[key] = (counts[key] || 0) + 1;
+            });
+            // Prendre le plus fréquent
+            const mostFrequent = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+            totalAmount = parseFloat(mostFrequent);
+        } else if (amounts.length > 0) {
+            totalAmount = Math.min(...amounts);
+        }
+        console.log('Montant total détecté:', totalAmount);
+    }
+    
+    // Si pas de montant trouvé dans les lignes de total, chercher tous les montants
+    if (amounts.length === 0) {
+        for (let line of lines) {
+            const matches = line.matchAll(/([0-9]+[,.]?[0-9]*)\s*€?/g);
+            for (let match of matches) {
+                const amount = parseAmount(match[1]);
+                if (!isNaN(amount) && amount > 0 && amount < 1000) {
+                    amounts.push(amount);
+                }
+            }
+        }
+    }
+    
+    // Prendre le montant le plus élevé comme total (mais raisonnable)
+    if (amounts.length > 0) {
+        // Filtrer les montants aberrants (> 1000€ pour un ticket standard)
+        const reasonableAmounts = amounts.filter(a => a < 1000);
+        if (reasonableAmounts.length > 0) {
+            totalAmount = Math.max(...reasonableAmounts);
+        } else {
+            totalAmount = Math.min(...amounts); // Si tous > 1000, prendre le plus petit
+        }
+        console.log('Montant total détecté:', totalAmount);
+    }
+    
+    // 4. Extraire les articles
+    const items = [];
+    
+    // Patterns pour détecter les articles avec prix
+    const itemPatterns = [
+        // Format: Article prix,décimal €
+        /^(.+?)\s+(\d+)[,.](\d{2})\s*[€\s]*\d*$/,
+        // Format: Article prix €
+        /^(.+?)\s+(\d+)\s*€/,
+        // Format avec quantité au début: 1 Article prix
+        /^\d+\s+(.+?)\s+(\d+[,.]?\d*)/,
+        // Format simple: texte nombre
+        /^([^\d]+)\s+(\d+[,.]?\d+)$/
+    ];
+    
+    for (let line of lines) {
+        // Ignorer les lignes d'en-tête, de pied et les codes
+        if (/TOTAL|MONTANT|ESPECES|CB|RENDU|TVA|SOUS[\s\-]?TOTAL|DATE|HEURE|CAISSE|TICKET|MERCI|SIRET|TEL|FACTURE|CLIENT|ADRESSE|COMMANDE|CREE PAR|LIVRER|ARTICLES|GRATUIT|RECEPTION|LIVRAISON|REGLEMENT|DONT|CODE|RCS|N°\s*TVA|POINTS|CUMUL/i.test(line)) {
+            continue;
+        }
+        
+        // Ignorer les lignes trop courtes ou qui sont juste des chiffres
+        if (line.length < 3 || /^\d+$/.test(line.trim())) continue;
+        
+        // Ignorer les lignes qui ressemblent à des numéros (RCS, tel, etc)
+        if (/^\d{3}\s*\d{3}\s*\d{3}/.test(line)) continue;
+        if (/^[0-9\s\-\.]+$/.test(line)) continue;
+        
+        // Essayer de détecter un article avec prix
+        for (let pattern of itemPatterns) {
+            const match = line.match(pattern);
+            if (match) {
+                let name, price;
+                
+                if (match.length === 4) {
+                    // Format avec virgule/point et décimales séparées
+                    name = match[1].trim();
+                    price = parseFloat(match[2] + '.' + match[3]);
+                } else if (match.length === 3) {
+                    name = match[1].trim();
+                    const priceStr = match[2].replace(',', '.');
+                    price = parseFloat(priceStr);
+                } else {
+                    continue;
+                }
+                
+                // Nettoyer le nom (enlever les caractères spéciaux au début)
+                name = name.replace(/^[\|\+\-\*\/\s]+/, '').trim();
+                
+                // Ignorer si le nom est trop court ou ressemble à un code
+                if (name.length < 2) continue;
+                if (/^[A-Z0-9\-]+$/.test(name) && !name.includes(' ')) continue;
+                
+                // Ignorer les prix aberrants ou nuls
+                if (isNaN(price) || price <= 0 || price > 200) continue;
+                
+                // Nettoyer les codes produits au début
+                name = name.replace(/^[A-Z]?\d+[-\s]*[A-Z]?\d*[-\s]*/, '');
+                
+                items.push({ name, price });
+                console.log('Article détecté:', name, price);
+                break;
+            }
+        }
+    }
+    
+    // Remplir les champs
+    document.getElementById('detectedStore').value = storeName;
+    document.getElementById('detectedDate').value = detectedDate;
+    document.getElementById('detectedAmount').value = totalAmount > 0 ? totalAmount.toFixed(2) : '';
+    
+    // Afficher les articles détectés
+    const itemsContainer = document.getElementById('detectedItems');
+    if (items.length > 0) {
+        // Stocker les articles dans window pour pouvoir les éditer
+        window.scannedItems = items;
+        
+        itemsContainer.innerHTML = items.map((item, index) => `
+            <div id="item-${index}" style="display: flex; justify-content: space-between; padding: 0.5rem; margin-bottom: 0.25rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" 
+                 onmouseover="this.style.background='var(--bg-secondary)'" 
+                 onmouseout="this.style.background='transparent'"
+                 onclick="window.editScannedItem(${index})">
+                <span>${item.name}</span>
+                <span style="font-weight: 600;">${item.price.toFixed(2)}€</span>
+            </div>
+        `).join('');
+        
+        // Calculer et afficher le sous-total des articles
+        const itemsTotal = items.reduce((sum, item) => sum + item.price, 0);
+        itemsContainer.innerHTML += `
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem 0 0; margin-top: 0.5rem; border-top: 2px solid var(--primary); font-weight: 600;">
+                <span>Sous-total articles:</span>
+                <span id="itemsSubtotal">${itemsTotal.toFixed(2)}€</span>
+            </div>
+        `;
+    } else {
+        window.scannedItems = [];
+        itemsContainer.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem;">Aucun article détecté - Vous pouvez en ajouter manuellement</div>';
+    }
+    
+    // Stocker les données extraites
+    window.scannedReceiptData = {
+        store: storeName,
+        date: detectedDate,
+        total: totalAmount,
+        items: items,
+        rawText: text
+    };
+};
+
+// Fonction pour éditer un article scanné
+window.editScannedItem = function(index) {
+    const item = window.scannedItems[index];
+    if (!item) return;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'editItemModal';
+    modal.style.zIndex = '10001';
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <span class="material-icons" style="margin-right: 0.5rem;">edit</span>
+                Modifier l'article
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; gap: 1rem;">
+                    <div>
+                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Nom de l'article :</label>
+                        <input type="text" id="editItemName" class="input" value="${item.name}">
+                    </div>
+                    <div>
+                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Prix :</label>
+                        <input type="number" id="editItemPrice" class="input" step="0.01" value="${item.price.toFixed(2)}">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="window.deleteScannedItem(${index})">
+                    <span class="material-icons">delete</span>
+                    Supprimer
+                </button>
+                <button class="btn" onclick="window.closeEditItemModal()">Annuler</button>
+                <button class="btn" style="background: var(--success);" onclick="window.saveEditedItem(${index})">
+                    <span class="material-icons">save</span>
+                    Enregistrer
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+};
+
+// Sauvegarder l'article édité
+window.saveEditedItem = function(index) {
+    const name = document.getElementById('editItemName').value.trim();
+    const price = parseFloat(document.getElementById('editItemPrice').value);
+    
+    if (name && !isNaN(price) && price >= 0) {
+        window.scannedItems[index] = { name, price };
+        window.updateItemsDisplay();
+        window.closeEditItemModal();
+    } else {
+        alert('Veuillez entrer un nom et un prix valide');
+    }
+};
+
+// Supprimer un article
+window.deleteScannedItem = function(index) {
+    window.scannedItems.splice(index, 1);
+    window.updateItemsDisplay();
+    window.closeEditItemModal();
+};
+
+// Fermer le modal d'édition
+window.closeEditItemModal = function() {
+    const modal = document.getElementById('editItemModal');
+    if (modal) {
+        modal.remove();
+    }
+};
+
+// Ajouter un article manuellement
+window.addManualItem = function() {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'addItemModal';
+    modal.style.zIndex = '10001';
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <span class="material-icons" style="margin-right: 0.5rem;">add_shopping_cart</span>
+                Ajouter un article
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; gap: 1rem;">
+                    <div>
+                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Nom de l'article :</label>
+                        <input type="text" id="newItemName" class="input" placeholder="Ex: Pain, Café...">
+                    </div>
+                    <div>
+                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Prix :</label>
+                        <input type="number" id="newItemPrice" class="input" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="window.closeAddItemModal()">Annuler</button>
+                <button class="btn" style="background: var(--success);" onclick="window.confirmAddItem()">
+                    <span class="material-icons">add</span>
+                    Ajouter
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.getElementById('newItemName').focus();
+};
+
+// Confirmer l'ajout d'un article
+window.confirmAddItem = function() {
+    const name = document.getElementById('newItemName').value.trim();
+    const price = parseFloat(document.getElementById('newItemPrice').value);
+    
+    if (name && !isNaN(price) && price > 0) {
+        if (!window.scannedItems) {
+            window.scannedItems = [];
+        }
+        window.scannedItems.push({ name, price });
+        window.updateItemsDisplay();
+        window.closeAddItemModal();
+    } else {
+        alert('Veuillez entrer un nom et un prix valide');
+    }
+};
+
+// Fermer le modal d'ajout
+window.closeAddItemModal = function() {
+    const modal = document.getElementById('addItemModal');
+    if (modal) {
+        modal.remove();
+    }
+};
+
+// Mettre à jour l'affichage des articles
+window.updateItemsDisplay = function() {
+    const itemsContainer = document.getElementById('detectedItems');
+    const items = window.scannedItems || [];
+    
+    if (items.length > 0) {
+        itemsContainer.innerHTML = items.map((item, index) => `
+            <div id="item-${index}" style="display: flex; justify-content: space-between; padding: 0.5rem; margin-bottom: 0.25rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" 
+                 onmouseover="this.style.background='var(--bg-secondary)'" 
+                 onmouseout="this.style.background='transparent'"
+                 onclick="window.editScannedItem(${index})">
+                <span>${item.name}</span>
+                <span style="font-weight: 600;">${item.price.toFixed(2)}€</span>
+            </div>
+        `).join('');
+        
+        // Calculer et afficher le sous-total
+        const itemsTotal = items.reduce((sum, item) => sum + item.price, 0);
+        itemsContainer.innerHTML += `
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem 0 0; margin-top: 0.5rem; border-top: 2px solid var(--primary); font-weight: 600;">
+                <span>Sous-total articles:</span>
+                <span id="itemsSubtotal">${itemsTotal.toFixed(2)}€</span>
+            </div>
+        `;
+    } else {
+        itemsContainer.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem;">Aucun article - Vous pouvez en ajouter manuellement</div>';
+    }
+    
+    // Mettre à jour les données scannées
+    if (window.scannedReceiptData) {
+        window.scannedReceiptData.items = items;
+    }
+};
+
+// Recalculer le total depuis les articles
+window.recalculateTotal = function() {
+    const items = window.scannedItems || [];
+    if (items.length > 0) {
+        const total = items.reduce((sum, item) => sum + item.price, 0);
+        document.getElementById('detectedAmount').value = total.toFixed(2);
+    } else {
+        alert('Aucun article pour calculer le total');
+    }
+};
+};
+
+// Ajouter la dépense scannée
+window.addScannedExpense = function() {
+    const store = document.getElementById('detectedStore').value.trim();
+    const date = document.getElementById('detectedDate').value;
+    const amount = parseFloat(document.getElementById('detectedAmount').value);
+    const assignTo = document.getElementById('assignToUser').value;
+    
+    console.log('Ajout dépense - Store:', store, 'Amount:', amount, 'AssignTo:', assignTo);
+    
+    if (!store) {
+        alert('Veuillez entrer le nom du magasin');
+        return;
+    }
+    
+    if (!amount || amount <= 0) {
+        alert('Veuillez entrer un montant valide');
+        return;
+    }
+    
+    if (!assignTo) {
+        alert('Veuillez choisir à qui attribuer cette dépense');
+        return;
+    }
+    
+    // Créer la description de la dépense
+    const description = `${store} - Ticket scanné`;
+    
+    // Récupérer appData depuis le scope global ou parent
+    let data = window.appData;
+    if (!data && window.parent && window.parent.appData) {
+        data = window.parent.appData;
+    }
+    if (!data && typeof appData !== 'undefined') {
+        data = appData;
+        window.appData = appData; // Exposer globalement
+    }
+    
+    if (!data) {
+        alert('Erreur: Les données de l\'application ne sont pas accessibles. Rechargez la page.');
+        console.error('appData non trouvé');
+        return;
+    }
+    
+    console.log('appData trouvé:', data);
+    
+    if (assignTo === 'commun') {
+        // Dépense commune
+        const participants = [];
+        document.querySelectorAll('#commonParticipants input[type="checkbox"]:checked').forEach(checkbox => {
+            participants.push(checkbox.value);
+        });
+        
+        if (participants.length === 0) {
+            alert('Veuillez sélectionner au moins un participant');
+            return;
+        }
+        
+        if (!data.commonExpenses) {
+            data.commonExpenses = [];
+        }
+        
+        data.commonExpenses.push({
+            name: description,
+            amount: amount,
+            participants: participants,
+            date: date || new Date().toISOString(),
+            scanned: true
+        });
+        
+        console.log('Dépense commune ajoutée:', data.commonExpenses);
+    } else {
+        // Dépense individuelle
+        if (!data.users || !data.users[assignTo]) {
+            alert('Erreur: Utilisateur non trouvé');
+            console.error('Utilisateur non trouvé:', assignTo, 'dans', data.users);
+            return;
+        }
+        
+        if (!data.users[assignTo].expenses) {
+            data.users[assignTo].expenses = [];
+        }
+        
+        const newExpense = {
+            name: description,
+            amount: amount,
+            date: date || new Date().toISOString(),
+            scanned: true,
+            items: window.scannedItems || [] // Utiliser les articles édités
+        };
+        
+        data.users[assignTo].expenses.push(newExpense);
+        console.log('Dépense ajoutée à', data.users[assignTo].name, ':', newExpense);
+        console.log('Total des dépenses de', data.users[assignTo].name, ':', data.users[assignTo].expenses);
+    }
+    
+    // Sauvegarder
+    window.appData = data; // S'assurer que c'est global
+    
+    // Essayer plusieurs méthodes de sauvegarde
+    let saved = false;
+    
+    // Méthode 1: saveData global
+    if (typeof window.saveData === 'function') {
+        window.saveData();
+        saved = true;
+        console.log('Sauvegarde via window.saveData()');
+    } 
+    // Méthode 2: saveData dans le parent
+    else if (window.parent && typeof window.parent.saveData === 'function') {
+        window.parent.saveData();
+        saved = true;
+        console.log('Sauvegarde via window.parent.saveData()');
+    }
+    // Méthode 3: Direct localStorage
+    else {
+        try {
+            localStorage.setItem('expenseTrackerData', JSON.stringify(data));
+            saved = true;
+            console.log('Sauvegarde directe dans localStorage');
+        } catch (e) {
+            console.error('Erreur de sauvegarde:', e);
+        }
+    }
+    
+    if (!saved) {
+        alert('Erreur lors de la sauvegarde. Vérifiez la console.');
+        return;
+    }
+    
+    // Rafraîchir l'affichage
+    if (typeof window.renderApp === 'function') {
+        window.renderApp();
+    } else if (window.parent && typeof window.parent.renderApp === 'function') {
+        window.parent.renderApp();
+    }
+    
+    // Fermer le modal
+    window.closeScanModal();
+    
+    // Message de succès
+    const message = `Ticket de ${amount.toFixed(2)}€ ajouté ${assignTo === 'commun' ? 'aux dépenses communes' : 'à ' + data.users[assignTo].name} !`;
+    
+    if (typeof window.showSuccessMessage === 'function') {
+        window.showSuccessMessage(message);
+    } else {
+        // Créer un message de succès simple
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #10b981;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10000;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+};
+
+// Fermer le modal de scan
+window.closeScanModal = function() {
+    const modal = document.getElementById('scanModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+    window.scannedReceiptData = null;
+};
+
+// Exposer la fonction principale
+window.scanReceipt = window.scanReceiptOCR;
+
+console.log('Module OCR Scanner chargé avec succès');
