@@ -695,23 +695,77 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderItems(items, type, userId) {
-        if (items.length === 0) {
-            return '<div class="empty-state">Aucun élément ajouté</div>';
-        }
-        
-        return items.map((item, index) => `
-            <div class="item">
-                <div class="item-info">
-                    <div class="item-name">${item.name}</div>
-                </div>
-                <div class="item-actions">
-                    <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
-                    <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
-                </div>
-            </div>
-        `).join('');
+
+function renderItems(items, type, userId) {
+    if (items.length === 0) {
+        return '<div class="empty-state">Aucun élément ajouté</div>';
     }
+    
+    return items.map((item, index) => {
+        // Si c'est une dépense scannée avec des articles
+        if (item.scanned && item.items && item.items.length > 0) {
+            const itemId = `${userId}-${type}-${index}`;
+            return `
+                <div class="item">
+                    <div class="item-info" style="flex: 1;">
+                        <div class="item-name" style="cursor: pointer;" onclick="toggleItemDetails('${itemId}')">
+                            ${item.name}
+                            <span class="material-icons" id="icon-${itemId}" style="font-size: 16px; vertical-align: middle; margin-left: 4px;">
+                                expand_more
+                            </span>
+                        </div>
+                        <div id="details-${itemId}" style="display: none; margin-top: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 4px; font-size: 0.875rem;">
+                            <div style="margin-bottom: 4px; font-weight: 600;">Articles scannés :</div>
+                            ${item.items.map(article => 
+                                `<div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                                    <span>${article.name}</span>
+                                    <span>${article.price.toFixed(2)}€</span>
+                                </div>`
+                            ).join('')}
+                            <div style="border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; font-weight: 600;">
+                                Total calculé : ${item.items.reduce((sum, a) => sum + a.price, 0).toFixed(2)}€
+                            </div>
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
+                        <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Affichage normal pour les autres éléments
+            return `
+                <div class="item">
+                    <div class="item-info">
+                        <div class="item-name">${item.name}</div>
+                    </div>
+                    <div class="item-actions">
+                        <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
+                        <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
+                    </div>
+                </div>
+            `;
+        }
+    }).join('');
+}
+
+// AJOUTEZ cette fonction APRÈS renderItems (nouvelle fonction) :
+
+function toggleItemDetails(itemId) {
+    const detailsDiv = document.getElementById(`details-${itemId}`);
+    const icon = document.getElementById(`icon-${itemId}`);
+    
+    if (detailsDiv) {
+        if (detailsDiv.style.display === 'none') {
+            detailsDiv.style.display = 'block';
+            if (icon) icon.textContent = 'expand_less';
+        } else {
+            detailsDiv.style.display = 'none';
+            if (icon) icon.textContent = 'expand_more';
+        }
+    }
+}
 
     // Gestion des onglets
     function switchTab(tabId) {
