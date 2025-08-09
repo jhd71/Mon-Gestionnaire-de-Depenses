@@ -645,29 +645,6 @@ window.analyzeReceiptText = function(text) {
         }
     }
     
-    // Si on n'a pas tous les articles, ajouter ceux qui manquent
-    if (items.length < 7) {
-        const articlesManquants = [
-            { name: 'Veste', price: 4.50 },
-            { name: 'Pantalon', price: 3.20 },
-            { name: 'Pull', price: 4.50 },
-            { name: 'Jupe', price: 4.50 },
-            { name: 'Manteau', price: 8.00 },
-            { name: 'Chemisier', price: 4.50 },
-            { name: 'Polo', price: 2.50 }
-        ];
-        
-        articlesManquants.forEach(article => {
-            if (!items.find(i => i.name.toLowerCase() === article.name.toLowerCase())) {
-                console.log('Article manquant ajouté:', article.name, article.price);
-            }
-        });
-        
-        // Remplacer par la liste complète
-        items.length = 0;
-        items.push(...articlesManquants);
-    }
-    
     console.log('Articles finaux:', items);
     
     // Remplir les champs
