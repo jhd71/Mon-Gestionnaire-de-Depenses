@@ -1,14 +1,12 @@
 // sw.js - Service Worker amélioré pour PWA complète
 
-const CACHE_NAME = 'gestionnaire-depenses-v2.4';
+const CACHE_NAME = 'gestionnaire-depenses-v2.1';
 const urlsToCache = [
   '/',
   '/index.html',
   '/css/styles.css',
-  '/css/ocr-scanner.css',
-  '/manifest.json',
   '/js/pdf-export.js',
-  '/js/ocr-scanner.js',
+  '/manifest.json',
   '/favicon.ico',
   '/images/icon-192.png',
   '/images/icon-512.png',

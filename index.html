@@ -14,18 +14,17 @@
     <title>Gestionnaire de Dépenses</title>
     <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="css/styles.css">
-	<link rel="stylesheet" href="css/ocr-scanner.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <meta name="theme-color" content="#2563eb">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="apple-touch-icon" href="./images/icon-192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="./images/icon-180.png">
-<link rel="icon" type="image/png" sizes="32x32" href="./images/icon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="./images/icon-16.png">
-<meta name="msapplication-TileColor" content="#2563eb">
-<meta name="msapplication-TileImage" content="./images/icon-144.png">
+	<link rel="apple-touch-icon" sizes="180x180" href="./images/icon-180.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./images/icon-32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./images/icon-16.png">
+	<meta name="msapplication-TileColor" content="#2563eb">
+	<meta name="msapplication-TileImage" content="./images/icon-144.png">
 </head>
 <body>
     <div class="header">
@@ -231,17 +230,11 @@
             Installer l'application
         </button>
         
-        <!-- NOUVEAU BOUTON SCANNER -->
-        <button class="btn" onclick="scanReceipt()" style="background-color: #10b981;">
-            <span class="material-icons">document_scanner</span>
-            Scanner un ticket de caisse
-        </button>
-        
         <button class="btn" onclick="exportData()">
             <span class="material-icons">download</span>
             Exporter les données
         </button>
-        <button class="btn" onclick="exportToPDF()">
+		<button class="btn" onclick="exportToPDF()">
             <span class="material-icons">picture_as_pdf</span>
             Exporter en PDF
         </button>
@@ -303,7 +296,7 @@
     let sessionStart = Date.now();
 
     // Initialisation
-document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', () => {
     // Appliquer le thème sauvegardé ou celui déjà défini par le script du head
     const preferredTheme = localStorage.getItem('preferredTheme') || 
                           document.body.getAttribute('data-theme') || 
@@ -312,71 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.setAttribute('data-theme', preferredTheme);
     document.documentElement.setAttribute('data-theme', preferredTheme);
     
-    // Charger les données UNE SEULE FOIS
+    // S'assurer que appData sera synchronisé après le chargement
     loadData();
-    
-    // IMPORTANT: Exposer les données APRÈS le chargement
-    window.appData = appData;
-    window.saveData = saveData;
-    window.renderApp = renderApp;
-    window.closeModal = closeModal;
-    window.openModal = openModal;
-    
-    // Fonction pour afficher un message de succès
-    window.showSuccessMessage = function(message) {
-        const toast = document.createElement('div');
-        toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            padding: 1rem 2rem;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
-            z-index: 10000;
-            font-weight: 600;
-            font-size: 1.125rem;
-            animation: slideInDown 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        `;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.style.animation = 'slideOutUp 0.4s ease-in';
-            setTimeout(() => toast.remove(), 400);
-        }, 3000);
-    };
-    
-    // Ajouter les animations CSS si elles n'existent pas
-    if (!document.getElementById('toastAnimations')) {
-        const style = document.createElement('style');
-        style.id = 'toastAnimations';
-        style.textContent = `
-            @keyframes slideInDown {
-                from {
-                    transform: translate(-50%, -100%);
-                    opacity: 0;
-                }
-                to {
-                    transform: translate(-50%, 0);
-                    opacity: 1;
-                }
-            }
-            @keyframes slideOutUp {
-                from {
-                    transform: translate(-50%, 0);
-                    opacity: 1;
-                }
-                to {
-                    transform: translate(-50%, -100%);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-    }
     
     // Forcer la synchronisation du thème après le chargement des données
     if (appData.theme !== preferredTheme) {
@@ -384,49 +314,42 @@ document.addEventListener('DOMContentLoaded', () => {
         saveData();
     }
     
-    // NE PAS APPELER loadData() UNE DEUXIÈME FOIS !
-    syncTheme();
+    loadData();
+	syncTheme();
     initPWA();
     renderApp();
     initDonation();
-    
-    // Masquer le FAB au démarrage si on est sur le tableau de bord
-    if (appData.currentTab === 'dashboard') {
-        document.getElementById('fabButton').style.display = 'none';
-    }
-    
-    // Surcharge de exportData pour le tracking
-    const originalExportData = exportData;
-    window.exportData = function() {
-        originalExportData();
-        trackUserAction();
         
-        // Message contextuel après export (seulement une fois)
-        if (!localStorage.getItem('exportDonationSuggested')) {
-            setTimeout(() => {
-                if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
-                    showDonationPopup();
-                }
-                localStorage.setItem('exportDonationSuggested', 'true');
-            }, 500);
+        // Masquer le FAB au démarrage si on est sur le tableau de bord
+        if (appData.currentTab === 'dashboard') {
+            document.getElementById('fabButton').style.display = 'none';
         }
-    };
-    
-    // Sauvegarde automatique toutes les 5 secondes
-    setInterval(() => {
-        saveData();
-        // Re-synchroniser window.appData au cas où
-        window.appData = appData;
-    }, 5000);
-});
+        
+        // Surcharge de exportData pour le tracking
+        const originalExportData = exportData;
+        window.exportData = function() {
+            originalExportData();
+            trackUserAction();
+            
+            // Message contextuel après export (seulement une fois)
+            if (!localStorage.getItem('exportDonationSuggested')) {
+                setTimeout(() => {
+                    if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
+                        showDonationPopup();
+                    }
+                    localStorage.setItem('exportDonationSuggested', 'true');
+                }, 500);
+            }
+        };
+        
+        setInterval(saveData, 5000); // Sauvegarde automatique toutes les 5 secondes
+    });
 
     // Fonctions de gestion des données
     function loadData() {
     const saved = localStorage.getItem('expenseTrackerData');
     if (saved) {
         appData = JSON.parse(saved);
-        // IMPORTANT: Synchroniser window.appData après le chargement
-        window.appData = appData;
     }
     
     // Charger le thème préféré de l'utilisateur
@@ -440,16 +363,11 @@ document.addEventListener('DOMContentLoaded', () => {
         appData.theme = currentBodyTheme;
         localStorage.setItem('preferredTheme', currentBodyTheme);
     }
-    
-    // Synchroniser window.appData
-    window.appData = appData;
 }
 
     function saveData() {
-    localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
-    // S'assurer que window.appData est synchronisé
-    window.appData = appData;
-}
+        localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
+    }
 
     // Fonctions de donation
     function trackUserAction() {
@@ -695,77 +613,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
-function renderItems(items, type, userId) {
-    if (items.length === 0) {
-        return '<div class="empty-state">Aucun élément ajouté</div>';
-    }
-    
-    return items.map((item, index) => {
-        // Si c'est une dépense scannée avec des articles
-        if (item.scanned && item.items && item.items.length > 0) {
-            const itemId = `${userId}-${type}-${index}`;
-            return `
-                <div class="item">
-                    <div class="item-info" style="flex: 1;">
-                        <div class="item-name" style="cursor: pointer;" onclick="toggleItemDetails('${itemId}')">
-                            ${item.name}
-                            <span class="material-icons" id="icon-${itemId}" style="font-size: 16px; vertical-align: middle; margin-left: 4px;">
-                                expand_more
-                            </span>
-                        </div>
-                        <div id="details-${itemId}" style="display: none; margin-top: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 4px; font-size: 0.875rem;">
-                            <div style="margin-bottom: 4px; font-weight: 600;">Articles scannés :</div>
-                            ${item.items.map(article => 
-                                `<div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                                    <span>${article.name}</span>
-                                    <span>${article.price.toFixed(2)}€</span>
-                                </div>`
-                            ).join('')}
-                            <div style="border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; font-weight: 600;">
-                                Total calculé : ${item.items.reduce((sum, a) => sum + a.price, 0).toFixed(2)}€
-                            </div>
-                        </div>
-                    </div>
-                    <div class="item-actions">
-                        <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
-                        <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
-                    </div>
-                </div>
-            `;
-        } else {
-            // Affichage normal pour les autres éléments
-            return `
-                <div class="item">
-                    <div class="item-info">
-                        <div class="item-name">${item.name}</div>
-                    </div>
-                    <div class="item-actions">
-                        <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
-                        <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
-                    </div>
-                </div>
-            `;
+    function renderItems(items, type, userId) {
+        if (items.length === 0) {
+            return '<div class="empty-state">Aucun élément ajouté</div>';
         }
-    }).join('');
-}
-
-// AJOUTEZ cette fonction APRÈS renderItems (nouvelle fonction) :
-
-function toggleItemDetails(itemId) {
-    const detailsDiv = document.getElementById(`details-${itemId}`);
-    const icon = document.getElementById(`icon-${itemId}`);
-    
-    if (detailsDiv) {
-        if (detailsDiv.style.display === 'none') {
-            detailsDiv.style.display = 'block';
-            if (icon) icon.textContent = 'expand_less';
-        } else {
-            detailsDiv.style.display = 'none';
-            if (icon) icon.textContent = 'expand_more';
-        }
+        
+        return items.map((item, index) => `
+            <div class="item">
+                <div class="item-info">
+                    <div class="item-name">${item.name}</div>
+                </div>
+                <div class="item-actions">
+                    <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
+                    <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
+                </div>
+            </div>
+        `).join('');
     }
-}
 
     // Gestion des onglets
     function switchTab(tabId) {
@@ -1689,16 +1553,6 @@ function showSuccessMessage(message) {
         setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
-
-// Fonction wrapper pour le scanner OCR
-function scanReceipt() {
-    if (typeof window.scanReceiptOCR === 'function') {
-        window.scanReceiptOCR();
-    } else {
-        alert('Le module de scan est en cours de chargement. Veuillez réessayer dans quelques secondes.');
-    }
-}
-
 </script>
 	<!-- Popup de donation -->
 <div id="donationPopup" class="donation-overlay" style="display: none;">
@@ -1718,6 +1572,5 @@ function scanReceipt() {
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/pdf-export.js"></script>
-<script src="js/ocr-scanner.js"></script>
 </body>
 </html>
