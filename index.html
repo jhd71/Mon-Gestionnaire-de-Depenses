@@ -308,9 +308,6 @@
     document.body.setAttribute('data-theme', preferredTheme);
     document.documentElement.setAttribute('data-theme', preferredTheme);
     
-    // S'assurer que appData sera synchronisé après le chargement
-    loadData();
-    
     // Forcer la synchronisation du thème après le chargement des données
     if (appData.theme !== preferredTheme) {
         appData.theme = preferredTheme;
