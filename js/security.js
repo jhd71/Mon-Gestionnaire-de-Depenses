@@ -1,5 +1,4 @@
-// security.js - Système de sécurité avec code PIN
-
+// ========== SYSTÈME DE SÉCURITÉ PIN ==========
 let currentPin = '';
 let isSettingPin = false;
 let pinAttempts = 0;
@@ -20,12 +19,10 @@ function showPinScreen() {
     
     const modal = document.getElementById('pinModal');
     modal.classList.add('active');
-    modal.style.zIndex = '100000'; // Au-dessus de tout
+    modal.style.zIndex = '100000';
     
-    // Empêcher la fermeture du modal
-    modal.onclick = (e) => {
-        e.stopPropagation();
-    };
+    document.getElementById('pinTitle').textContent = 'Entrez votre code PIN';
+    document.getElementById('pinError').style.display = 'none';
     
     // Bloquer toute l'interface
     document.body.style.pointerEvents = 'none';
@@ -38,6 +35,11 @@ function addPinDigit(digit) {
         currentPin += digit;
         updatePinDisplay();
         
+        // Vibration tactile
+        if (navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+        
         // Vérification automatique à 4 chiffres
         if (currentPin.length === 4) {
             setTimeout(submitPin, 200);
@@ -49,6 +51,7 @@ function addPinDigit(digit) {
 function clearPin() {
     currentPin = '';
     updatePinDisplay();
+    document.getElementById('pinError').style.display = 'none';
 }
 
 // Mettre à jour l'affichage du PIN
@@ -76,11 +79,13 @@ function submitPin() {
     
     if (isSettingPin) {
         // Définir un nouveau PIN
+        appData.security = appData.security || {};
         appData.security.pin = hashPin(currentPin);
         appData.security.pinEnabled = true;
         saveData();
         
         showSuccessMessage('Code PIN défini avec succès !');
+        document.body.style.pointerEvents = '';
         closeModal('pinModal');
         isSettingPin = false;
     } else {
@@ -100,21 +105,24 @@ function submitPin() {
             currentPin = '';
             updatePinDisplay();
             
+            const errorDiv = document.getElementById('pinError');
+            errorDiv.style.display = 'block';
+            
             if (pinAttempts >= MAX_ATTEMPTS) {
-                // Trop de tentatives - réinitialiser l'app
-                alert('Trop de tentatives échouées. L\'application va se réinitialiser.');
-                localStorage.clear();
-                location.reload();
+                errorDiv.textContent = 'Trop de tentatives. Réinitialisation...';
+                setTimeout(() => {
+                    localStorage.clear();
+                    location.reload();
+                }, 2000);
             } else {
-                showErrorMessage(`PIN incorrect. ${MAX_ATTEMPTS - pinAttempts} tentative(s) restante(s)`);
+                errorDiv.textContent = `PIN incorrect. ${MAX_ATTEMPTS - pinAttempts} tentative(s) restante(s)`;
             }
         }
     }
 }
 
-// Hacher le PIN (simple pour la démo)
+// Hacher le PIN
 function hashPin(pin) {
-    // Dans une vraie app, utilisez un vrai algorithme de hachage
     let hash = 0;
     for (let i = 0; i < pin.length; i++) {
         const char = pin.charCodeAt(i);
@@ -129,7 +137,7 @@ function verifyPin(pin) {
     return hashPin(pin) === appData.security.pin;
 }
 
-// Animation de secousse pour PIN incorrect
+// Animation de secousse
 function shakePin() {
     const modal = document.querySelector('#pinModal .modal-content');
     modal.style.animation = 'shake 0.5s';
@@ -138,13 +146,13 @@ function shakePin() {
     }, 500);
 }
 
-// Timer d'inactivité (verrouiller après 5 minutes)
+// Timer d'inactivité
 let inactivityTimer;
 
 function startInactivityTimer() {
     clearTimeout(inactivityTimer);
     
-    if (!appData.security.pinEnabled) return;
+    if (!appData.security || !appData.security.pinEnabled) return;
     
     inactivityTimer = setTimeout(() => {
         showPinScreen();
@@ -156,66 +164,48 @@ document.addEventListener('click', startInactivityTimer);
 document.addEventListener('keypress', startInactivityTimer);
 document.addEventListener('touchstart', startInactivityTimer);
 
-// Activer/Désactiver le PIN depuis les paramètres
+// Activer/Désactiver le PIN
 function togglePinSecurity() {
-    if (appData.security.pinEnabled) {
-        // Désactiver - demander le PIN actuel d'abord
+    if (appData.security && appData.security.pinEnabled) {
+        // Désactiver - demander le PIN actuel
+        document.getElementById('pinTitle').textContent = 'Entrez le PIN actuel pour désactiver';
         currentPin = '';
         updatePinDisplay();
+        isSettingPin = false;
         
-        const modal = document.getElementById('pinModal');
-        modal.classList.add('active');
-        
-        // Attendre la vérification puis désactiver
-        window.pinVerificationCallback = () => {
-            appData.security.pinEnabled = false;
-            appData.security.pin = null;
-            saveData();
-            showSuccessMessage('Code PIN désactivé');
+        // Modifier temporairement submitPin
+        const originalSubmit = window.submitPin;
+        window.submitPin = function() {
+            if (currentPin.length !== 4) {
+                shakePin();
+                return;
+            }
+            
+            if (verifyPin(currentPin)) {
+                appData.security.pinEnabled = false;
+                appData.security.pin = null;
+                saveData();
+                showSuccessMessage('Code PIN désactivé');
+                document.body.style.pointerEvents = '';
+                closeModal('pinModal');
+                window.submitPin = originalSubmit;
+            } else {
+                shakePin();
+                currentPin = '';
+                updatePinDisplay();
+                document.getElementById('pinError').style.display = 'block';
+                document.getElementById('pinError').textContent = 'PIN incorrect';
+            }
         };
+        
+        showPinScreen();
     } else {
-        // Activer - définir un nouveau PIN
+        // Activer - définir nouveau PIN
         isSettingPin = true;
         currentPin = '';
         updatePinDisplay();
-        
-        const header = document.querySelector('#pinModal .modal-header');
-        header.innerHTML = '<span class="material-icons" style="margin-right: 0.5rem;">lock</span>Définir un code PIN';
-        
+        document.getElementById('pinTitle').textContent = 'Définir un code PIN (4 chiffres)';
+        document.getElementById('pinError').style.display = 'none';
         openModal('pinModal');
     }
 }
-
-// Ajouter le style pour l'animation shake
-const pinStyle = document.createElement('style');
-pinStyle.textContent = `
-    @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
-        20%, 40%, 60%, 80% { transform: translateX(10px); }
-    }
-    
-    .pin-btn {
-        background: var(--bg-tertiary);
-        border: none;
-        border-radius: 50%;
-        width: 60px;
-        height: 60px;
-        font-size: 1.25rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-        color: var(--text-primary);
-    }
-    
-    .pin-btn:hover {
-        background: var(--primary);
-        color: white;
-        transform: scale(1.1);
-    }
-    
-    .pin-btn:active {
-        transform: scale(0.95);
-    }
-`;
-document.head.appendChild(pinStyle);
