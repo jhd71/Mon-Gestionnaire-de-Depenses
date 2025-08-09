@@ -588,19 +588,7 @@ window.analyzeReceiptText = function(text) {
     
     // 4. Extraire les articles - VERSION COMPLÈTEMENT CORRIGÉE
     const items = [];
-    
-    // Articles attendus pour ce ticket ACE (avec prix corrigés)
-    const expectedArticles = {
-        'veste': 4.50,
-        'pantalon': 3.20,
-        'pul': 4.50,
-        'pull': 4.50,
-        'jupe': 4.50,
-        'manteau': 8.00,
-        'chemisier': 4.50,
-        'cherisier': 4.50,  // Faute de frappe pour chemisier
-        'polo': 2.50
-    };
+
     
     // Parser les lignes pour extraire les articles
     for (let line of lines) {
