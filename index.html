@@ -231,7 +231,7 @@
         </button>
 		<button class="btn" onclick="togglePinSecurity()">
 			<span class="material-icons">lock</span>
-			${appData.security?.pinEnabled ? 'Désactiver' : 'Activer'} le code PIN
+			<span id="pinButtonText">Activer le code PIN</span>
 		</button>
         <button class="btn" onclick="exportData()">
             <span class="material-icons">download</span>
@@ -318,6 +318,7 @@
     }
     
     loadData();
+	initSecurity();
 	syncTheme();
     initPWA();
     renderApp();
@@ -452,6 +453,14 @@
         renderDashboard();
         renderUserTabs();
         renderCommonTab();
+		// Mettre à jour le texte du bouton PIN dans les paramètres
+function updatePinButtonText() {
+    const btn = document.getElementById('pinButtonText');
+    if (btn) {
+        btn.textContent = (appData.security && appData.security.pinEnabled) ? 
+            'Désactiver le code PIN' : 'Activer le code PIN';
+    }
+}
     }
 
     function renderTabs() {
@@ -1576,5 +1585,34 @@ function showSuccessMessage(message) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/pdf-export.js"></script>
 <script src="js/security.js"></script>
+<!-- Modal de sécurité PIN -->
+<div class="modal" id="pinModal">
+    <div class="modal-content" style="max-width: 350px;">
+        <div class="modal-header">
+            <span class="material-icons" style="margin-right: 0.5rem;">lock</span>
+            <span id="pinTitle">Entrez votre code PIN</span>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+            <div id="pinDisplay" style="font-size: 2rem; letter-spacing: 1rem; margin: 1rem 0;">
+                ○○○○
+            </div>
+            <div id="pinError" style="color: var(--danger); font-size: 0.875rem; margin-bottom: 1rem; display: none;"></div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; max-width: 200px; margin: 0 auto;">
+                <button class="pin-btn" onclick="addPinDigit(1)">1</button>
+                <button class="pin-btn" onclick="addPinDigit(2)">2</button>
+                <button class="pin-btn" onclick="addPinDigit(3)">3</button>
+                <button class="pin-btn" onclick="addPinDigit(4)">4</button>
+                <button class="pin-btn" onclick="addPinDigit(5)">5</button>
+                <button class="pin-btn" onclick="addPinDigit(6)">6</button>
+                <button class="pin-btn" onclick="addPinDigit(7)">7</button>
+                <button class="pin-btn" onclick="addPinDigit(8)">8</button>
+                <button class="pin-btn" onclick="addPinDigit(9)">9</button>
+                <button class="pin-btn" onclick="clearPin()">C</button>
+                <button class="pin-btn" onclick="addPinDigit(0)">0</button>
+                <button class="pin-btn" onclick="submitPin()">✓</button>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
