@@ -450,6 +450,7 @@
         renderDashboard();
         renderUserTabs();
         renderCommonTab();
+		updatePinButtonText();
     }
 
     function renderTabs() {
@@ -1013,6 +1014,7 @@ function syncTheme() {
 
     // Paramètres
     function openSettings() {
+		updatePinButtonText();
         openModal('settingsModal');
     }
 
@@ -1228,6 +1230,16 @@ function syncTheme() {
         openModal('statsModal');
     }
 
+// Mettre à jour le texte du bouton PIN dans les paramètres
+    function updatePinButtonText() {
+        const btn = document.getElementById('pinButtonText');
+        if (btn) {
+            // Assurez-vous que appData.security existe avant d'essayer d'y accéder
+            btn.textContent = (appData.security && appData.security.pinEnabled) ? 
+                'Désactiver le code PIN' : 'Activer le code PIN';
+        }
+    }
+	
 // PWA et installation améliorée
 function initPWA() {
     if ('serviceWorker' in navigator) {
