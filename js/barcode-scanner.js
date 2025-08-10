@@ -150,8 +150,11 @@ window.scanBarcode = function() {
     let optionsHTML = '<option value="">Choisir...</option>';
     optionsHTML += '<option value="commun">🏠 Dépense commune</option>';
     
+    // Récupérer appData depuis le contexte global
+    const appData = window.appData || JSON.parse(localStorage.getItem('expenseTrackerData')) || { users: {} };
+    
     // Ajouter les utilisateurs (sauf commun)
-    const users = Object.entries(window.appData.users || {}).filter(([id]) => id !== 'commun');
+    const users = Object.entries(appData.users || {}).filter(([id]) => id !== 'commun');
     users.forEach(([id, user]) => {
         optionsHTML += `<option value="${id}">👤 ${user.name}</option>`;
     });
@@ -167,8 +170,11 @@ window.scanBarcode = function() {
             // Afficher et remplir les participants
             commonParticipants.style.display = 'block';
             
+            // Récupérer appData
+            const appData = window.appData || JSON.parse(localStorage.getItem('expenseTrackerData')) || { users: {} };
+            
             // Générer les checkboxes des participants
-            const users = Object.entries(window.appData.users || {})
+            const users = Object.entries(appData.users || {})
                 .filter(([id]) => id !== 'commun');
             
             if (users.length > 0) {
