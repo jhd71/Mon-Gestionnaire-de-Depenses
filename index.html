@@ -61,9 +61,30 @@
 
         <!-- Onglet Commun -->
         <div id="commun" class="tab-content">
+            <!-- Section Balance : Qui doit combien à qui -->
+            <div class="section" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border: 1px solid var(--primary);">
+                <div class="section-header">
+                    <h2 class="section-title">⚖️ Balance : Qui doit quoi ?</h2>
+                </div>
+                <div id="balance-content" class="items-list">
+                    <div class="empty-state">Ajoutez des utilisateurs et des transactions pour voir la balance</div>
+                </div>
+            </div>
+
+            <!-- Section Virements -->
             <div class="section">
                 <div class="section-header">
-                    <h2 class="section-title">Revenus</h2>
+                    <h2 class="section-title">💸 Virements entre personnes</h2>
+                    <button class="btn btn-small" onclick="addTransfer()">+ Ajouter</button>
+                </div>
+                <div id="transfers-list" class="items-list">
+                    <div class="empty-state">Aucun virement ajouté</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">Revenus communs</h2>
                     <button class="btn btn-small" onclick="addIncome('commun')">+ Ajouter</button>
                 </div>
                 <div id="commun-incomes" class="items-list">
@@ -179,6 +200,36 @@
         </div>
     </div>
 
+    <!-- Modal pour ajouter un virement -->
+    <div class="modal" id="addTransferModal">
+        <div class="modal-content">
+            <div class="modal-header">💸 Ajouter un virement</div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    Un virement représente de l'argent qu'une personne a sur son compte mais qui appartient à quelqu'un d'autre.
+                </p>
+                <input type="text" class="input" id="transferDescription" placeholder="Description (ex: Salaire avancé)" style="margin-bottom: 0.75rem;">
+                <input type="number" class="input" id="transferAmount" placeholder="Montant" step="0.01" style="margin-bottom: 0.75rem;">
+                <div style="margin-top: 0.5rem;">
+                    <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">De :</label>
+                    <select class="input" id="transferFrom" style="margin-bottom: 0.75rem;">
+                        <!-- Généré dynamiquement -->
+                    </select>
+                </div>
+                <div style="margin-top: 0.5rem;">
+                    <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Vers (à qui appartient l'argent) :</label>
+                    <select class="input" id="transferTo">
+                        <!-- Généré dynamiquement -->
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('addTransferModal')">Annuler</button>
+                <button class="btn" onclick="confirmAddTransfer()">Ajouter</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal calculatrice -->
     <div class="modal" id="calculatorModal">
         <div class="modal-content">
@@ -287,6 +338,7 @@
             }
         },
         commonExpenses: [],
+        transfers: [], // Nouveau : virements entre personnes
         currentTab: 'dashboard',
         theme: 'dark'
     };
@@ -450,7 +502,9 @@
         renderDashboard();
         renderUserTabs();
         renderCommonTab();
-		updatePinButtonText();
+        renderBalance();
+        renderTransfers();
+        updatePinButtonText();
     }
 
     function renderTabs() {
@@ -517,10 +571,37 @@
             });
         }
         
+        // Calculer les virements (argent détenu pour d'autres)
+        let transferBalance = 0;
+        if (appData.transfers && userId !== 'commun') {
+            appData.transfers.forEach(transfer => {
+                if (transfer.from === userId) {
+                    // Cet utilisateur a de l'argent qui appartient à quelqu'un d'autre
+                    transferBalance -= transfer.amount;
+                }
+                if (transfer.to === userId) {
+                    // Cet utilisateur a de l'argent chez quelqu'un d'autre
+                    transferBalance += transfer.amount;
+                }
+            });
+        }
+        
         const balance = totalIncome - totalExpense - commonShare;
+        const realBalance = balance + transferBalance;
         
         const card = document.createElement('div');
         card.className = 'user-card';
+        
+        // Afficher une info sur les virements si applicable
+        let transferInfo = '';
+        if (transferBalance !== 0 && userId !== 'commun') {
+            if (transferBalance > 0) {
+                transferInfo = `<div style="font-size: 0.75rem; color: var(--success); margin-top: 0.5rem;">💰 +${transferBalance.toFixed(2)}€ à récupérer</div>`;
+            } else {
+                transferInfo = `<div style="font-size: 0.75rem; color: var(--danger); margin-top: 0.5rem;">💸 ${transferBalance.toFixed(2)}€ à rembourser</div>`;
+            }
+        }
+        
         card.innerHTML = `
             <h3>${user.name}</h3>
             <div class="stats">
@@ -535,6 +616,7 @@
                 <div class="stat">
                     <div class="stat-label">Solde</div>
                     <div class="stat-value balance">${balance.toFixed(2)}€</div>
+                    ${transferInfo}
                 </div>
             </div>
         `;
@@ -820,6 +902,252 @@
         showConfirm('Êtes-vous sûr de vouloir supprimer cet élément ?');
     }
 
+// ========== GESTION DES VIREMENTS ==========
+    
+    // Ouvrir le modal d'ajout de virement
+    function addTransfer() {
+        document.getElementById('transferDescription').value = '';
+        document.getElementById('transferAmount').value = '';
+        
+        // Générer les listes déroulantes
+        const transferFrom = document.getElementById('transferFrom');
+        const transferTo = document.getElementById('transferTo');
+        transferFrom.innerHTML = '';
+        transferTo.innerHTML = '';
+        
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                const option1 = document.createElement('option');
+                option1.value = userId;
+                option1.textContent = appData.users[userId].name;
+                transferFrom.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = userId;
+                option2.textContent = appData.users[userId].name;
+                transferTo.appendChild(option2);
+            }
+        }
+        
+        openModal('addTransferModal');
+    }
+    
+    // Confirmer l'ajout d'un virement
+    function confirmAddTransfer() {
+        const description = document.getElementById('transferDescription').value.trim();
+        const amount = parseFloat(document.getElementById('transferAmount').value);
+        const fromUser = document.getElementById('transferFrom').value;
+        const toUser = document.getElementById('transferTo').value;
+        
+        if (!description) {
+            alert('Veuillez entrer une description');
+            return;
+        }
+        if (!amount || amount <= 0) {
+            alert('Veuillez entrer un montant valide');
+            return;
+        }
+        if (fromUser === toUser) {
+            alert('La personne source et destination doivent être différentes');
+            return;
+        }
+        
+        // Initialiser le tableau des virements s'il n'existe pas
+        if (!appData.transfers) {
+            appData.transfers = [];
+        }
+        
+        appData.transfers.push({
+            description: description,
+            amount: amount,
+            from: fromUser,
+            to: toUser,
+            date: new Date().toISOString()
+        });
+        
+        saveData();
+        renderApp();
+        closeModal('addTransferModal');
+        trackUserAction();
+        showSuccessMessage('Virement ajouté !');
+    }
+    
+    // Supprimer un virement
+    function deleteTransfer(index) {
+        confirmCallback = () => {
+            appData.transfers.splice(index, 1);
+            saveData();
+            renderApp();
+        };
+        showConfirm('Êtes-vous sûr de vouloir supprimer ce virement ?');
+    }
+    
+    // Calculer la balance entre tous les utilisateurs
+    function calculateBalance() {
+        const balances = {}; // { "userId": montant } positif = doit recevoir, négatif = doit payer
+        
+        // Initialiser les balances à 0 pour chaque utilisateur
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                balances[userId] = 0;
+            }
+        }
+        
+        // 1. Prendre en compte les virements
+        if (appData.transfers) {
+            appData.transfers.forEach(transfer => {
+                // La personne "from" a l'argent mais il appartient à "to"
+                // Donc "from" doit de l'argent à "to"
+                balances[transfer.from] -= transfer.amount; // from doit payer
+                balances[transfer.to] += transfer.amount;   // to doit recevoir
+            });
+        }
+        
+        // 2. Prendre en compte les dépenses communes
+        appData.commonExpenses.forEach(expense => {
+            const sharePerPerson = expense.amount / expense.participants.length;
+            expense.participants.forEach(participantId => {
+                balances[participantId] -= sharePerPerson; // Chacun doit sa part
+            });
+        });
+        
+        // 3. Prendre en compte les revenus personnels vs dépenses personnelles
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                const user = appData.users[userId];
+                const totalIncome = user.incomes.reduce((sum, item) => sum + item.amount, 0);
+                const totalExpense = user.expenses.reduce((sum, item) => sum + item.amount, 0);
+                // Les revenus et dépenses personnels n'affectent pas la balance entre utilisateurs
+                // sauf si on veut les inclure dans un calcul global
+            }
+        }
+        
+        return balances;
+    }
+    
+    // Calculer "qui doit combien à qui" à partir des balances
+    function calculateDebts() {
+        const balances = calculateBalance();
+        const debts = []; // { from: userId, to: userId, amount: number }
+        
+        // Séparer les débiteurs et créditeurs
+        const debtors = []; // Ceux qui doivent de l'argent (balance négative)
+        const creditors = []; // Ceux qui doivent recevoir de l'argent (balance positive)
+        
+        for (const userId in balances) {
+            const balance = balances[userId];
+            if (balance < -0.01) { // Seuil pour éviter les erreurs d'arrondi
+                debtors.push({ userId, amount: Math.abs(balance) });
+            } else if (balance > 0.01) {
+                creditors.push({ userId, amount: balance });
+            }
+        }
+        
+        // Algorithme simple pour minimiser les transactions
+        debtors.sort((a, b) => b.amount - a.amount);
+        creditors.sort((a, b) => b.amount - a.amount);
+        
+        let i = 0, j = 0;
+        while (i < debtors.length && j < creditors.length) {
+            const debtor = debtors[i];
+            const creditor = creditors[j];
+            
+            const amount = Math.min(debtor.amount, creditor.amount);
+            
+            if (amount > 0.01) {
+                debts.push({
+                    from: debtor.userId,
+                    to: creditor.userId,
+                    amount: amount
+                });
+            }
+            
+            debtor.amount -= amount;
+            creditor.amount -= amount;
+            
+            if (debtor.amount < 0.01) i++;
+            if (creditor.amount < 0.01) j++;
+        }
+        
+        return debts;
+    }
+    
+    // Afficher la section Balance
+    function renderBalance() {
+        const container = document.getElementById('balance-content');
+        if (!container) return;
+        
+        const userCount = Object.keys(appData.users).filter(id => id !== 'commun').length;
+        
+        if (userCount < 2) {
+            container.innerHTML = '<div class="empty-state">Ajoutez au moins 2 utilisateurs pour voir la balance</div>';
+            return;
+        }
+        
+        const debts = calculateDebts();
+        
+        if (debts.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 1.5rem;">
+                    <span style="font-size: 2.5rem;">✅</span>
+                    <p style="margin-top: 0.75rem; font-weight: 600; color: var(--success);">Tout est équilibré !</p>
+                    <p style="font-size: 0.875rem; color: var(--text-secondary);">Personne ne doit d'argent à personne</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = debts.map(debt => {
+            const fromName = appData.users[debt.from]?.name || 'Inconnu';
+            const toName = appData.users[debt.to]?.name || 'Inconnu';
+            return `
+                <div class="item" style="background: var(--bg-tertiary); border-radius: var(--radius-lg); padding: 1rem;">
+                    <div class="item-info" style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="font-size: 1.25rem;">👤</span>
+                        <div>
+                            <div style="font-weight: 600; color: var(--danger);">${fromName}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">doit payer à</div>
+                            <div style="font-weight: 600; color: var(--success);">${toName}</div>
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <span style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">${debt.amount.toFixed(2)}€</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // Afficher la liste des virements
+    function renderTransfers() {
+        const container = document.getElementById('transfers-list');
+        if (!container) return;
+        
+        if (!appData.transfers || appData.transfers.length === 0) {
+            container.innerHTML = '<div class="empty-state">Aucun virement ajouté</div>';
+            return;
+        }
+        
+        container.innerHTML = appData.transfers.map((transfer, index) => {
+            const fromName = appData.users[transfer.from]?.name || 'Inconnu';
+            const toName = appData.users[transfer.to]?.name || 'Inconnu';
+            return `
+                <div class="item">
+                    <div class="item-info">
+                        <div class="item-name">${transfer.description}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                            ${fromName} → ${toName} (${fromName} a l'argent de ${toName})
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <span class="item-amount" style="color: var(--warning);">${transfer.amount.toFixed(2)}€</span>
+                        <button class="btn btn-small btn-danger" onclick="deleteTransfer(${index})">×</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+	
     function deleteCommonExpense(index) {
         confirmCallback = () => {
             appData.commonExpenses.splice(index, 1);
