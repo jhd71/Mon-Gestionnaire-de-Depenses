@@ -212,19 +212,33 @@
         <div class="modal-content" style="max-width: 420px;">
             <div class="modal-header">🔗 Partager ce groupe</div>
             <div class="modal-body">
+                
+                <!-- Section 1 : Code du groupe -->
                 <div style="text-align: center; margin-bottom: 1.5rem;">
-                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                        Partagez ce code avec vos amis pour qu'ils puissent rejoindre et synchroniser les données.
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.875rem;">
+                        Votre code de groupe unique
                     </p>
                     <div class="share-code" id="shareCode">XXXXX</div>
-                    <button class="btn btn-small btn-outline" onclick="copyShareCode()" style="margin-top: 0.5rem;">
-                        <span class="material-icons" style="font-size: 1rem;">content_copy</span>
-                        Copier le code
-                    </button>
+                    <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
+                        <button class="btn btn-small" onclick="copyShareCode()">
+                            <span class="material-icons" style="font-size: 1rem;">content_copy</span>
+                            Copier le code
+                        </button>
+                        <button class="btn btn-small btn-success" onclick="copyShareLink()">
+                            <span class="material-icons" style="font-size: 1rem;">link</span>
+                            Copier le lien
+                        </button>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.75rem;">
+                        💡 Le lien permet d'importer directement les données
+                    </p>
                 </div>
                 
+                <!-- Section 2 : Rejoindre un groupe -->
                 <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1rem;">
-                    <h4 style="margin-bottom: 1rem; font-weight: 600;">📥 Rejoindre un groupe</h4>
+                    <h4 style="margin-bottom: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>📥</span> Rejoindre un groupe
+                    </h4>
                     <input type="text" class="input" id="joinCode" placeholder="Entrez le code du groupe" style="text-transform: uppercase; letter-spacing: 0.1em; text-align: center; margin-bottom: 0.75rem;">
                     <button class="btn" onclick="joinGroup()" style="width: 100%;">
                         <span class="material-icons">group_add</span>
@@ -232,19 +246,26 @@
                     </button>
                 </div>
                 
+                <!-- Section 3 : Export/Import fichier -->
                 <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
-                    <h4 style="margin-bottom: 1rem; font-weight: 600;">💾 Export / Import manuel</h4>
+                    <h4 style="margin-bottom: 0.5rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>💾</span> Sauvegarde fichier
+                    </h4>
+                    <p style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 1rem;">
+                        Exportez vos données dans un fichier ou importez depuis un fichier
+                    </p>
                     <div style="display: flex; gap: 0.75rem;">
-                        <button class="btn btn-outline" onclick="exportShareData()" style="flex: 1;">
+                        <button class="btn btn-outline" onclick="exportToFile()" style="flex: 1;">
                             <span class="material-icons">download</span>
-                            Exporter
+                            Télécharger
                         </button>
-                        <button class="btn btn-outline" onclick="importShareData()" style="flex: 1;">
+                        <button class="btn btn-outline" onclick="importFromFile()" style="flex: 1;">
                             <span class="material-icons">upload</span>
                             Importer
                         </button>
                     </div>
                 </div>
+                
             </div>
             <div class="modal-footer">
                 <button class="btn" onclick="closeModal('shareModal')" style="flex: 1;">Fermer</button>
@@ -1264,22 +1285,11 @@
     // Copier le code de partage
     function copyShareCode() {
         const code = document.getElementById('shareCode').textContent;
-        navigator.clipboard.writeText(code).then(() => {
-            showSuccessMessage('Code copié ! 📋');
-        }).catch(() => {
-            // Fallback pour les navigateurs plus anciens
-            const textArea = document.createElement('textarea');
-            textArea.value = code;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            showSuccessMessage('Code copié ! 📋');
-        });
+        copyToClipboard(code, 'Code copié ! 📋');
     }
     
-    // Exporter les données pour le partage
-    function exportShareData() {
+    // Copier le lien de partage
+    function copyShareLink() {
         const dataToShare = {
             groupId: getGroupId(),
             users: appData.users,
@@ -1291,33 +1301,73 @@
         
         const jsonString = JSON.stringify(dataToShare);
         const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
-        
-        // Créer le lien de partage
         const shareUrl = `${window.location.origin}${window.location.pathname}?import=${base64Data}`;
         
-        // Si le lien est trop long, proposer de télécharger un fichier
+        // Vérifier si le lien n'est pas trop long
         if (shareUrl.length > 2000) {
-            // Télécharger en fichier
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `depenses_${getGroupId()}_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showSuccessMessage('Fichier téléchargé ! 📥');
-        } else {
-            // Copier le lien
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                showSuccessMessage('Lien de partage copié ! 🔗');
+            alert('⚠️ Trop de données pour un lien.\n\nUtilisez "Télécharger" pour créer un fichier de sauvegarde.');
+            return;
+        }
+        
+        copyToClipboard(shareUrl, 'Lien de partage copié ! 🔗');
+    }
+    
+    // Fonction utilitaire pour copier dans le presse-papier
+    function copyToClipboard(text, successMessage) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showSuccessMessage(successMessage);
+            }).catch(() => {
+                fallbackCopy(text, successMessage);
             });
+        } else {
+            fallbackCopy(text, successMessage);
         }
     }
     
-    // Importer les données partagées
-    function importShareData() {
+    // Fallback pour copier sur les anciens navigateurs
+    function fallbackCopy(text, successMessage) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showSuccessMessage(successMessage);
+        } catch (err) {
+            alert('Erreur lors de la copie. Copiez manuellement : ' + text);
+        }
+        document.body.removeChild(textArea);
+    }
+    
+    // Exporter les données dans un fichier
+    function exportToFile() {
+        const dataToExport = {
+            groupId: getGroupId(),
+            users: appData.users,
+            commonExpenses: appData.commonExpenses,
+            transfers: appData.transfers || [],
+            exportDate: new Date().toISOString(),
+            version: '2.0'
+        };
+        
+        const jsonString = JSON.stringify(dataToExport, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `depenses_${getGroupId()}_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showSuccessMessage('Fichier téléchargé ! 📥');
+    }
+    
+    // Importer les données depuis un fichier
+    function importFromFile() {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';
@@ -1331,13 +1381,28 @@
                 try {
                     const importedData = JSON.parse(event.target.result);
                     
-                    if (confirm(`Voulez-vous importer les données du groupe "${importedData.groupId}" ?\n\nCela remplacera vos données actuelles.`)) {
+                    // Vérifier que c'est un fichier valide
+                    if (!importedData.users || !importedData.groupId) {
+                        alert('❌ Fichier invalide.\n\nCe fichier ne contient pas de données de dépenses valides.');
+                        return;
+                    }
+                    
+                    const userCount = Object.keys(importedData.users).filter(id => id !== 'commun').length;
+                    const expenseCount = (importedData.commonExpenses || []).length;
+                    const transferCount = (importedData.transfers || []).length;
+                    
+                    if (confirm(`📦 Importer les données du groupe "${importedData.groupId}" ?\n\n` +
+                               `• ${userCount} utilisateur(s)\n` +
+                               `• ${expenseCount} dépense(s) commune(s)\n` +
+                               `• ${transferCount} virement(s)\n\n` +
+                               `⚠️ Cela remplacera vos données actuelles.`)) {
                         mergeImportedData(importedData);
                         showSuccessMessage('Données importées ! ✅');
                         closeModal('shareModal');
                     }
                 } catch (error) {
-                    alert('Erreur lors de l\'import : fichier invalide');
+                    alert('❌ Erreur lors de l\'import.\n\nLe fichier est corrompu ou invalide.');
+                    console.error('Import error:', error);
                 }
             };
             reader.readAsText(file);
@@ -1351,7 +1416,7 @@
         const code = document.getElementById('joinCode').value.trim().toUpperCase();
         
         if (!code || code.length < 5) {
-            alert('Veuillez entrer un code valide (5 caractères)');
+            alert('⚠️ Code invalide\n\nEntrez un code de 5 caractères.');
             return;
         }
         
@@ -1361,16 +1426,21 @@
             return;
         }
         
-        // Pour l'instant, on informe l'utilisateur comment synchroniser
-        alert(`Pour synchroniser avec le groupe "${code}" :\n\n1. Demandez à un membre du groupe de vous envoyer le fichier d'export\n2. Utilisez le bouton "Importer" pour charger les données\n\n💡 Astuce : Le propriétaire du groupe peut utiliser "Exporter" pour créer un lien ou fichier de partage.`);
+        // Informer l'utilisateur comment synchroniser
+        alert(`📲 Pour rejoindre le groupe "${code}" :\n\n` +
+              `1. Demandez au propriétaire du groupe de vous envoyer :\n` +
+              `   • Le lien de partage (bouton "Copier le lien")\n` +
+              `   • Ou le fichier de sauvegarde (bouton "Télécharger")\n\n` +
+              `2. Ouvrez le lien reçu\n` +
+              `   Ou importez le fichier (bouton "Importer")\n\n` +
+              `💡 Le propriétaire du groupe a le code "${getGroupId()}"`);
     }
     
     // Fusionner les données importées
     function mergeImportedData(importedData) {
-        // Option 1 : Remplacer complètement
         appData.groupId = importedData.groupId;
         appData.users = importedData.users;
-        appData.commonExpenses = importedData.commonExpenses;
+        appData.commonExpenses = importedData.commonExpenses || [];
         appData.transfers = importedData.transfers || [];
         
         saveData();
@@ -1387,7 +1457,13 @@
                 const jsonString = decodeURIComponent(escape(atob(importData)));
                 const importedData = JSON.parse(jsonString);
                 
-                if (confirm(`Voulez-vous importer les données du groupe "${importedData.groupId}" ?\n\nCela remplacera vos données actuelles.`)) {
+                const userCount = Object.keys(importedData.users).filter(id => id !== 'commun').length;
+                const expenseCount = (importedData.commonExpenses || []).length;
+                
+                if (confirm(`📦 Importer les données du groupe "${importedData.groupId}" ?\n\n` +
+                           `• ${userCount} utilisateur(s)\n` +
+                           `• ${expenseCount} dépense(s) commune(s)\n\n` +
+                           `⚠️ Cela remplacera vos données actuelles.`)) {
                     mergeImportedData(importedData);
                     showSuccessMessage('Données importées depuis le lien ! ✅');
                 }
