@@ -91,10 +91,11 @@ body {
 .header {
     background: var(--primary-gradient);
     color: white;
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 1.5rem 1.25rem;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
+    gap: 0.75rem;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -103,17 +104,20 @@ body {
 }
 
 .header h1 {
-    font-size: 1.25rem;
+    font-size: 1.375rem;
     font-weight: 800;
     letter-spacing: -0.025em;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    text-align: center;
 }
 
 .header-buttons {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .btn-icon {
@@ -443,7 +447,7 @@ body {
 }
 
 .section-title {
-    font-size: 1.125rem;
+    font-size: 1.0rem;
     font-weight: 700;
     color: var(--text-primary);
     display: flex;
