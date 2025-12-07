@@ -527,7 +527,7 @@
         // Ajouter l'onglet Commun en dernier
         const communTab = document.createElement('button');
         communTab.className = `tab ${appData.currentTab === 'commun' ? 'active' : ''}`;
-        communTab.textContent = 'Commun';
+        communTab.textContent = 'Balance';
         communTab.onclick = () => switchTab('commun');
         tabsContainer.appendChild(communTab);
         
@@ -1943,5 +1943,8 @@ function showSuccessMessage(message) {
         </div>
     </div>
 </div>
+<!-- Scripts iOS -->
+<script src="js/ios-fixes.js"></script>
+<script src="js/ios-install.js"></script>
 </body>
 </html>
