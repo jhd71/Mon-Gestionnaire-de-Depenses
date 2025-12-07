@@ -30,6 +30,9 @@
     <div class="header">
         <h1>Gestionnaire de Dépenses 💰</h1>
         <div class="header-buttons">
+            <button class="btn-icon" onclick="openShareModal()" title="Partager">
+                <span class="material-icons">share</span>
+            </button>
             <button class="btn-icon" onclick="showStats()" title="Statistiques">
                 <span class="material-icons">insights</span>
             </button>
@@ -62,9 +65,13 @@
         <!-- Onglet Commun -->
         <div id="commun" class="tab-content">
             <!-- Section Balance : Qui doit combien à qui -->
-            <div class="section" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border: 1px solid var(--primary);">
+            <div class="section balance-section">
                 <div class="section-header">
                     <h2 class="section-title">⚖️ Balance : Qui doit quoi ?</h2>
+                    <button class="btn btn-small" onclick="openShareModal()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);">
+                        <span class="material-icons" style="font-size: 1rem;">share</span>
+                        Partager
+                    </button>
                 </div>
                 <div id="balance-content" class="items-list">
                     <div class="empty-state">Ajoutez des utilisateurs et des transactions pour voir la balance</div>
@@ -200,6 +207,51 @@
         </div>
     </div>
 
+<!-- Modal de partage -->
+    <div class="modal" id="shareModal">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">🔗 Partager ce groupe</div>
+            <div class="modal-body">
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                        Partagez ce code avec vos amis pour qu'ils puissent rejoindre et synchroniser les données.
+                    </p>
+                    <div class="share-code" id="shareCode">XXXXX</div>
+                    <button class="btn btn-small btn-outline" onclick="copyShareCode()" style="margin-top: 0.5rem;">
+                        <span class="material-icons" style="font-size: 1rem;">content_copy</span>
+                        Copier le code
+                    </button>
+                </div>
+                
+                <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1rem;">
+                    <h4 style="margin-bottom: 1rem; font-weight: 600;">📥 Rejoindre un groupe</h4>
+                    <input type="text" class="input" id="joinCode" placeholder="Entrez le code du groupe" style="text-transform: uppercase; letter-spacing: 0.1em; text-align: center; margin-bottom: 0.75rem;">
+                    <button class="btn" onclick="joinGroup()" style="width: 100%;">
+                        <span class="material-icons">group_add</span>
+                        Rejoindre
+                    </button>
+                </div>
+                
+                <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem; font-weight: 600;">💾 Export / Import manuel</h4>
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button class="btn btn-outline" onclick="exportShareData()" style="flex: 1;">
+                            <span class="material-icons">download</span>
+                            Exporter
+                        </button>
+                        <button class="btn btn-outline" onclick="importShareData()" style="flex: 1;">
+                            <span class="material-icons">upload</span>
+                            Importer
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('shareModal')" style="flex: 1;">Fermer</button>
+            </div>
+        </div>
+    </div>
+	
     <!-- Modal pour ajouter un virement -->
     <div class="modal" id="addTransferModal">
         <div class="modal-content">
@@ -367,6 +419,7 @@
     }
     
     loadData();
+    checkUrlImport();
 	initSecurity();
 	syncTheme();
     initPWA();
@@ -576,46 +629,56 @@
         if (appData.transfers && userId !== 'commun') {
             appData.transfers.forEach(transfer => {
                 if (transfer.from === userId) {
-                    // Cet utilisateur a de l'argent qui appartient à quelqu'un d'autre
                     transferBalance -= transfer.amount;
                 }
                 if (transfer.to === userId) {
-                    // Cet utilisateur a de l'argent chez quelqu'un d'autre
                     transferBalance += transfer.amount;
                 }
             });
         }
         
         const balance = totalIncome - totalExpense - commonShare;
-        const realBalance = balance + transferBalance;
+        const isPositive = balance >= 0;
         
-        const card = document.createElement('div');
-        card.className = 'user-card';
+        // Générer l'initiale pour l'avatar
+        const initial = user.name.charAt(0).toUpperCase();
         
-        // Afficher une info sur les virements si applicable
+        // Emoji selon le type
+        const emoji = userId === 'commun' ? '👥' : '👤';
+        
+        // Info virement
         let transferInfo = '';
         if (transferBalance !== 0 && userId !== 'commun') {
             if (transferBalance > 0) {
-                transferInfo = `<div style="font-size: 0.75rem; color: var(--success); margin-top: 0.5rem;">💰 +${transferBalance.toFixed(2)}€ à récupérer</div>`;
+                transferInfo = `<div class="transfer-info" style="color: var(--success);">💰 +${transferBalance.toFixed(2)}€ à récupérer</div>`;
             } else {
-                transferInfo = `<div style="font-size: 0.75rem; color: var(--danger); margin-top: 0.5rem;">💸 ${transferBalance.toFixed(2)}€ à rembourser</div>`;
+                transferInfo = `<div class="transfer-info" style="color: var(--danger);">💸 ${transferBalance.toFixed(2)}€ à rembourser</div>`;
             }
         }
         
+        const card = document.createElement('div');
+        card.className = 'user-card';
         card.innerHTML = `
-            <h3>${user.name}</h3>
-            <div class="stats">
-                <div class="stat">
-                    <div class="stat-label">Revenus</div>
-                    <div class="stat-value income">+${totalIncome.toFixed(2)}€</div>
+            <div class="user-card-header">
+                <div class="user-avatar">${emoji}</div>
+                <h3>${user.name}</h3>
+            </div>
+            <div class="user-card-body">
+                <div class="stats-grid">
+                    <div class="stat-card income">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-label">Revenus</div>
+                        <div class="stat-value">+${totalIncome.toFixed(2)}€</div>
+                    </div>
+                    <div class="stat-card expense">
+                        <div class="stat-icon">📉</div>
+                        <div class="stat-label">Dépenses</div>
+                        <div class="stat-value">-${(totalExpense + commonShare).toFixed(2)}€</div>
+                    </div>
                 </div>
-                <div class="stat">
-                    <div class="stat-label">Dépenses</div>
-                    <div class="stat-value expense">-${(totalExpense + commonShare).toFixed(2)}€</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">Solde</div>
-                    <div class="stat-value balance">${balance.toFixed(2)}€</div>
+                <div class="balance-card ${isPositive ? 'positive' : 'negative'}">
+                    <div class="balance-label">💰 Solde disponible</div>
+                    <div class="balance-value">${balance >= 0 ? '+' : ''}${balance.toFixed(2)}€</div>
                     ${transferInfo}
                 </div>
             </div>
@@ -699,17 +762,28 @@
 
     function renderItems(items, type, userId) {
         if (items.length === 0) {
-            return '<div class="empty-state">Aucun élément ajouté</div>';
+            const icon = type === 'income' ? '📈' : '📉';
+            return `
+                <div class="empty-state">
+                    <div class="empty-state-icon">${icon}</div>
+                    <div class="empty-state-text">Aucun élément ajouté</div>
+                </div>
+            `;
         }
         
+        const icon = type === 'income' ? '💵' : '🛒';
+        const itemClass = type === 'income' ? 'income-item' : 'expense-item';
+        
         return items.map((item, index) => `
-            <div class="item">
+            <div class="item ${itemClass}">
+                <div class="item-icon ${type}">${icon}</div>
                 <div class="item-info">
                     <div class="item-name">${item.name}</div>
+                    <div class="item-meta">${new Date(item.date).toLocaleDateString('fr-FR')}</div>
                 </div>
                 <div class="item-actions">
                     <span class="item-amount ${type}">${type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}€</span>
-                    <button class="btn btn-small btn-danger" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
+                    <button class="btn-delete" onclick="deleteItem('${userId}', '${type}s', ${index})">×</button>
                 </div>
             </div>
         `).join('');
@@ -1080,7 +1154,13 @@
         const userCount = Object.keys(appData.users).filter(id => id !== 'commun').length;
         
         if (userCount < 2) {
-            container.innerHTML = '<div class="empty-state">Ajoutez au moins 2 utilisateurs pour voir la balance</div>';
+            container.innerHTML = `
+                <div class="balance-empty">
+                    <div class="balance-empty-icon">👥</div>
+                    <div class="balance-empty-text">Ajoutez des participants</div>
+                    <div class="balance-empty-subtext">Il faut au moins 2 personnes pour calculer la balance</div>
+                </div>
+            `;
             return;
         }
         
@@ -1088,10 +1168,10 @@
         
         if (debts.length === 0) {
             container.innerHTML = `
-                <div style="text-align: center; padding: 1.5rem;">
-                    <span style="font-size: 2.5rem;">✅</span>
-                    <p style="margin-top: 0.75rem; font-weight: 600; color: var(--success);">Tout est équilibré !</p>
-                    <p style="font-size: 0.875rem; color: var(--text-secondary);">Personne ne doit d'argent à personne</p>
+                <div class="balance-empty">
+                    <div class="balance-empty-icon">✅</div>
+                    <div class="balance-empty-text">Tout est équilibré !</div>
+                    <div class="balance-empty-subtext">Personne ne doit d'argent à personne</div>
                 </div>
             `;
             return;
@@ -1100,19 +1180,19 @@
         container.innerHTML = debts.map(debt => {
             const fromName = appData.users[debt.from]?.name || 'Inconnu';
             const toName = appData.users[debt.to]?.name || 'Inconnu';
+            const fromInitial = fromName.charAt(0).toUpperCase();
+            
             return `
-                <div class="item" style="background: var(--bg-tertiary); border-radius: var(--radius-lg); padding: 1rem;">
-                    <div class="item-info" style="display: flex; align-items: center; gap: 0.75rem;">
-                        <span style="font-size: 1.25rem;">👤</span>
-                        <div>
-                            <div style="font-weight: 600; color: var(--danger);">${fromName}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary);">doit payer à</div>
-                            <div style="font-weight: 600; color: var(--success);">${toName}</div>
+                <div class="balance-item">
+                    <div class="balance-item-left">
+                        <div class="balance-avatar debtor">${fromInitial}</div>
+                        <div class="balance-names">
+                            <span class="balance-from">${fromName}</span>
+                            <span class="balance-arrow">➡️ doit payer à</span>
+                            <span class="balance-to">${toName}</span>
                         </div>
                     </div>
-                    <div class="item-actions">
-                        <span style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">${debt.amount.toFixed(2)}€</span>
-                    </div>
+                    <div class="balance-amount">${debt.amount.toFixed(2)}€</div>
                 </div>
             `;
         }).join('');
@@ -1124,7 +1204,12 @@
         if (!container) return;
         
         if (!appData.transfers || appData.transfers.length === 0) {
-            container.innerHTML = '<div class="empty-state">Aucun virement ajouté</div>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">💸</div>
+                    <div class="empty-state-text">Aucun virement ajouté</div>
+                </div>
+            `;
             return;
         }
         
@@ -1132,20 +1217,187 @@
             const fromName = appData.users[transfer.from]?.name || 'Inconnu';
             const toName = appData.users[transfer.to]?.name || 'Inconnu';
             return `
-                <div class="item">
+                <div class="item transfer-item">
+                    <div class="item-icon transfer">💸</div>
                     <div class="item-info">
                         <div class="item-name">${transfer.description}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                            ${fromName} → ${toName} (${fromName} a l'argent de ${toName})
-                        </div>
+                        <div class="item-meta">${fromName} détient l'argent de ${toName}</div>
                     </div>
                     <div class="item-actions">
-                        <span class="item-amount" style="color: var(--warning);">${transfer.amount.toFixed(2)}€</span>
-                        <button class="btn btn-small btn-danger" onclick="deleteTransfer(${index})">×</button>
+                        <span class="item-amount transfer">${transfer.amount.toFixed(2)}€</span>
+                        <button class="btn-delete" onclick="deleteTransfer(${index})">×</button>
                     </div>
                 </div>
             `;
         }).join('');
+    }
+	
+	// ========== SYSTÈME DE PARTAGE ==========
+    
+    // Générer ou récupérer l'ID du groupe
+    function getGroupId() {
+        if (!appData.groupId) {
+            appData.groupId = generateGroupCode();
+            saveData();
+        }
+        return appData.groupId;
+    }
+    
+    // Générer un code de groupe unique (5 caractères)
+    function generateGroupCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        for (let i = 0; i < 5; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
+    
+    // Ouvrir le modal de partage
+    function openShareModal() {
+        const code = getGroupId();
+        document.getElementById('shareCode').textContent = code;
+        document.getElementById('joinCode').value = '';
+        openModal('shareModal');
+    }
+    
+    // Copier le code de partage
+    function copyShareCode() {
+        const code = document.getElementById('shareCode').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+            showSuccessMessage('Code copié ! 📋');
+        }).catch(() => {
+            // Fallback pour les navigateurs plus anciens
+            const textArea = document.createElement('textarea');
+            textArea.value = code;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            showSuccessMessage('Code copié ! 📋');
+        });
+    }
+    
+    // Exporter les données pour le partage
+    function exportShareData() {
+        const dataToShare = {
+            groupId: getGroupId(),
+            users: appData.users,
+            commonExpenses: appData.commonExpenses,
+            transfers: appData.transfers || [],
+            exportDate: new Date().toISOString(),
+            version: '2.0'
+        };
+        
+        const jsonString = JSON.stringify(dataToShare);
+        const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
+        
+        // Créer le lien de partage
+        const shareUrl = `${window.location.origin}${window.location.pathname}?import=${base64Data}`;
+        
+        // Si le lien est trop long, proposer de télécharger un fichier
+        if (shareUrl.length > 2000) {
+            // Télécharger en fichier
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `depenses_${getGroupId()}_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showSuccessMessage('Fichier téléchargé ! 📥');
+        } else {
+            // Copier le lien
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showSuccessMessage('Lien de partage copié ! 🔗');
+            });
+        }
+    }
+    
+    // Importer les données partagées
+    function importShareData() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+                    
+                    if (confirm(`Voulez-vous importer les données du groupe "${importedData.groupId}" ?\n\nCela remplacera vos données actuelles.`)) {
+                        mergeImportedData(importedData);
+                        showSuccessMessage('Données importées ! ✅');
+                        closeModal('shareModal');
+                    }
+                } catch (error) {
+                    alert('Erreur lors de l\'import : fichier invalide');
+                }
+            };
+            reader.readAsText(file);
+        };
+        
+        input.click();
+    }
+    
+    // Rejoindre un groupe avec un code
+    function joinGroup() {
+        const code = document.getElementById('joinCode').value.trim().toUpperCase();
+        
+        if (!code || code.length < 5) {
+            alert('Veuillez entrer un code valide (5 caractères)');
+            return;
+        }
+        
+        // Vérifier si c'est le même groupe
+        if (code === getGroupId()) {
+            showSuccessMessage('Vous êtes déjà dans ce groupe ! 👍');
+            return;
+        }
+        
+        // Pour l'instant, on informe l'utilisateur comment synchroniser
+        alert(`Pour synchroniser avec le groupe "${code}" :\n\n1. Demandez à un membre du groupe de vous envoyer le fichier d'export\n2. Utilisez le bouton "Importer" pour charger les données\n\n💡 Astuce : Le propriétaire du groupe peut utiliser "Exporter" pour créer un lien ou fichier de partage.`);
+    }
+    
+    // Fusionner les données importées
+    function mergeImportedData(importedData) {
+        // Option 1 : Remplacer complètement
+        appData.groupId = importedData.groupId;
+        appData.users = importedData.users;
+        appData.commonExpenses = importedData.commonExpenses;
+        appData.transfers = importedData.transfers || [];
+        
+        saveData();
+        renderApp();
+    }
+    
+    // Vérifier s'il y a des données à importer dans l'URL
+    function checkUrlImport() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const importData = urlParams.get('import');
+        
+        if (importData) {
+            try {
+                const jsonString = decodeURIComponent(escape(atob(importData)));
+                const importedData = JSON.parse(jsonString);
+                
+                if (confirm(`Voulez-vous importer les données du groupe "${importedData.groupId}" ?\n\nCela remplacera vos données actuelles.`)) {
+                    mergeImportedData(importedData);
+                    showSuccessMessage('Données importées depuis le lien ! ✅');
+                }
+                
+                // Nettoyer l'URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (error) {
+                console.error('Erreur import URL:', error);
+            }
+        }
     }
 	
     function deleteCommonExpense(index) {
