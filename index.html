@@ -582,35 +582,39 @@
     }
 
     function renderTabs() {
-        const tabsContainer = document.getElementById('tabs');
-        tabsContainer.innerHTML = `
-            <button class="tab ${appData.currentTab === 'dashboard' ? 'active' : ''}" onclick="switchTab('dashboard')">Tableau de bord</button>
-        `;
+        const container = document.getElementById('tabs');
+        container.innerHTML = '';
         
-        // Ajouter les onglets utilisateurs (sauf Commun)
-        for (const userId in appData.users) {
-            if (userId !== 'commun') {
-                const tab = document.createElement('button');
-                tab.className = `tab ${appData.currentTab === userId ? 'active' : ''}`;
-                tab.textContent = appData.users[userId].name;
-                tab.onclick = () => switchTab(userId);
-                tabsContainer.appendChild(tab);
-            }
-        }
+        // Onglet Tableau de bord (toujours en premier)
+        const dashboardTab = document.createElement('button');
+        dashboardTab.className = 'tab' + (currentTab === 'dashboard' ? ' active' : '');
+        dashboardTab.textContent = 'Tableau de bord';
+        dashboardTab.onclick = () => switchTab('dashboard');
+        container.appendChild(dashboardTab);
         
-        // Ajouter l'onglet Commun en dernier
+        // Onglets des utilisateurs
+        Object.keys(appData.users).forEach(userId => {
+            if (userId === 'commun') return;
+            const tab = document.createElement('button');
+            tab.className = 'tab' + (currentTab === userId ? ' active' : '');
+            tab.textContent = appData.users[userId].name;
+            tab.onclick = () => switchTab(userId);
+            container.appendChild(tab);
+        });
+        
+        // Onglet Balance (anciennement Commun)
         const communTab = document.createElement('button');
-        communTab.className = `tab ${appData.currentTab === 'commun' ? 'active' : ''}`;
+        communTab.className = 'tab' + (currentTab === 'commun' ? ' active' : '');
         communTab.textContent = 'Balance';
         communTab.onclick = () => switchTab('commun');
-        tabsContainer.appendChild(communTab);
+        container.appendChild(communTab);
         
-        // Bouton d'ajout tout à la fin
-        const addTab = document.createElement('button');
-        addTab.className = 'add-tab';
-        addTab.textContent = '+';
-        addTab.onclick = addNewTab;
-        tabsContainer.appendChild(addTab);
+        // Bouton ajouter utilisateur
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-tab';
+        addBtn.textContent = '+';
+        addBtn.onclick = () => openModal('addUserModal');
+        container.appendChild(addBtn);
     }
 
     function renderDashboard() {
