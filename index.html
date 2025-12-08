@@ -189,19 +189,31 @@
     <!-- Modal pour ajouter une dépense commune -->
     <div class="modal" id="addCommonExpenseModal">
         <div class="modal-content">
-            <div class="modal-header">Ajouter une dépense commune</div>
+            <div class="modal-header">🛒 Nouvelle dépense commune</div>
             <div class="modal-body">
-                <input type="text" class="input" id="commonExpenseName" placeholder="Description" style="margin-bottom: 0.75rem;">
-                <input type="number" class="input" id="commonExpenseAmount" placeholder="Montant total" step="0.01">
-                <div style="margin-top: 1rem;">
-                    <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Participants :</label>
-                    <div class="participants" id="participantsList">
-                        <!-- Les participants seront générés ici -->
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Description</label>
+                    <input type="text" class="input" id="commonExpenseName" placeholder="Ex: Courses Leclerc">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Montant (€)</label>
+                    <input type="number" class="input" id="commonExpenseAmount" placeholder="0.00" step="0.01">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">💳 Payé par</label>
+                    <select class="input" id="commonExpensePaidBy">
+                        <!-- Rempli dynamiquement -->
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">👥 Participants (qui partage cette dépense)</label>
+                    <div id="participantsList" class="participants">
+                        <!-- Rempli dynamiquement -->
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-danger" onclick="closeModal('addCommonExpenseModal')">Annuler</button>
+                <button class="btn btn-outline" onclick="closeModal('addCommonExpenseModal')">Annuler</button>
                 <button class="btn" onclick="confirmAddCommonExpense()">Ajouter</button>
             </div>
         </div>
@@ -372,6 +384,10 @@
         <button class="btn" style="background-color: #e11d48;" onclick="showDonationPopup()">
             <span class="material-icons">favorite</span>
             Soutenir ce projet gratuit
+        </button>
+        <button class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);" onclick="clearCacheAndReload()">
+            <span class="material-icons">cached</span>
+            Vider le cache (mise à jour)
         </button>
         <button class="btn btn-danger" onclick="confirmReset()">
             <span class="material-icons">delete_forever</span>
@@ -769,22 +785,33 @@
         if (appData.commonExpenses.length === 0) {
             commonExpenses.innerHTML = '<div class="empty-state">Aucune dépense commune ajoutée</div>';
         } else {
-            commonExpenses.innerHTML = appData.commonExpenses.map((expense, index) => `
-                <div class="item">
-                    <div class="item-info">
-                        <div class="item-name">${expense.name}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                            Participants: ${expense.participants.map(p => appData.users[p].name).join(', ')}
+            commonExpenses.innerHTML = appData.commonExpenses.map((expense, index) => {
+                const paidByName = expense.paidBy ? (appData.users[expense.paidBy]?.name || 'Inconnu') : 'Non défini';
+                const participantNames = expense.participants.map(p => appData.users[p]?.name || 'Inconnu').join(', ');
+                const perPerson = expense.participants.length > 0 
+                    ? (expense.amount / expense.participants.length).toFixed(2) 
+                    : expense.amount.toFixed(2);
+                
+                return `
+                    <div class="item expense-item">
+                        <div class="item-icon expense">🛒</div>
+                        <div class="item-info">
+                            <div class="item-name">${expense.name}</div>
+                            <div class="item-meta">
+                                💳 Payé par <strong>${paidByName}</strong> • ${perPerson}€/pers
+                            </div>
+                            <div class="item-meta" style="font-size: 0.7rem; opacity: 0.7;">
+                                👥 ${participantNames}
+                            </div>
+                        </div>
+                        <div class="item-actions">
+                            <span class="item-amount expense">${expense.amount.toFixed(2)}€</span>
+                            <button class="btn-delete" onclick="deleteCommonExpense(${index})">×</button>
                         </div>
                     </div>
-                    <div class="item-actions">
-                        <span class="item-amount expense">-${expense.amount.toFixed(2)}€</span>
-                        <button class="btn btn-small btn-danger" onclick="deleteCommonExpense(${index})">×</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
-    }
 
     function renderItems(items, type, userId) {
         if (items.length === 0) {
@@ -921,17 +948,30 @@
         document.getElementById('commonExpenseName').value = '';
         document.getElementById('commonExpenseAmount').value = '';
         
+        // Générer la liste "Payé par"
+        const paidBySelect = document.getElementById('commonExpensePaidBy');
+        paidBySelect.innerHTML = '';
+        
         // Générer la liste des participants
         const participantsList = document.getElementById('participantsList');
         participantsList.innerHTML = '';
         
         for (const userId in appData.users) {
             if (userId !== 'commun') {
+                const userName = appData.users[userId].name;
+                
+                // Option pour "Payé par"
+                const option = document.createElement('option');
+                option.value = userId;
+                option.textContent = userName;
+                paidBySelect.appendChild(option);
+                
+                // Checkbox pour participants (cochés par défaut)
                 const checkbox = document.createElement('div');
                 checkbox.className = 'participant-checkbox';
                 checkbox.innerHTML = `
-                    <input type="checkbox" id="participant_${userId}" value="${userId}">
-                    <label for="participant_${userId}">${appData.users[userId].name}</label>
+                    <input type="checkbox" id="participant_${userId}" value="${userId}" checked>
+                    <label for="participant_${userId}">${userName}</label>
                 `;
                 participantsList.appendChild(checkbox);
             }
@@ -943,6 +983,17 @@
     function confirmAddCommonExpense() {
         const name = document.getElementById('commonExpenseName').value.trim();
         const amount = parseFloat(document.getElementById('commonExpenseAmount').value);
+        const paidBy = document.getElementById('commonExpensePaidBy').value;
+        
+        if (!name || isNaN(amount) || amount <= 0) {
+            alert('Veuillez remplir tous les champs correctement');
+            return;
+        }
+        
+        if (!paidBy) {
+            alert('Veuillez sélectionner qui a payé');
+            return;
+        }
         
         // Récupérer les participants sélectionnés
         const participants = [];
@@ -950,18 +1001,28 @@
             participants.push(checkbox.value);
         });
         
-        if (name && amount > 0 && participants.length > 0) {
-            appData.commonExpenses.push({
-                name: name,
-                amount: amount,
-                participants: participants,
-                date: new Date().toISOString()
-            });
-            saveData();
-            renderApp();
-            closeModal('addCommonExpenseModal');
-            trackUserAction();
+        if (participants.length === 0) {
+            alert('Veuillez sélectionner au moins un participant');
+            return;
         }
+        
+        appData.commonExpenses.push({
+            name: name,
+            amount: amount,
+            paidBy: paidBy,
+            participants: participants,
+            date: new Date().toISOString()
+        });
+        
+        saveData();
+        renderApp();
+        closeModal('addCommonExpenseModal');
+        trackUserAction();
+        
+        // Message de confirmation
+        const paidByName = appData.users[paidBy]?.name || 'Inconnu';
+        const perPerson = (amount / participants.length).toFixed(2);
+        showSuccessMessage(`${paidByName} a payé ${amount.toFixed(2)}€ (${perPerson}€/pers)`);
     }
 
     // Suppression d'un utilisateur
@@ -1096,31 +1157,33 @@
         // 1. Prendre en compte les virements
         if (appData.transfers) {
             appData.transfers.forEach(transfer => {
-                // La personne "from" a l'argent mais il appartient à "to"
-                // Donc "from" doit de l'argent à "to"
-                balances[transfer.from] -= transfer.amount; // from doit payer
-                balances[transfer.to] += transfer.amount;   // to doit recevoir
+                balances[transfer.from] -= transfer.amount;
+                balances[transfer.to] += transfer.amount;
             });
         }
         
-        // 2. Prendre en compte les dépenses communes
+        // 2. Prendre en compte les dépenses communes (avec "Payé par")
         appData.commonExpenses.forEach(expense => {
-            const sharePerPerson = expense.amount / expense.participants.length;
-            expense.participants.forEach(participantId => {
-                balances[participantId] -= sharePerPerson; // Chacun doit sa part
+            const paidBy = expense.paidBy;
+            const participants = expense.participants || [];
+            const amount = expense.amount;
+            
+            if (participants.length === 0) return;
+            
+            const sharePerPerson = amount / participants.length;
+            
+            // Le payeur a avancé tout le montant (il doit recevoir)
+            if (paidBy && balances[paidBy] !== undefined) {
+                balances[paidBy] += amount;
+            }
+            
+            // Chaque participant doit sa part (il doit payer)
+            participants.forEach(participantId => {
+                if (balances[participantId] !== undefined) {
+                    balances[participantId] -= sharePerPerson;
+                }
             });
         });
-        
-        // 3. Prendre en compte les revenus personnels vs dépenses personnelles
-        for (const userId in appData.users) {
-            if (userId !== 'commun') {
-                const user = appData.users[userId];
-                const totalIncome = user.incomes.reduce((sum, item) => sum + item.amount, 0);
-                const totalExpense = user.expenses.reduce((sum, item) => sum + item.amount, 0);
-                // Les revenus et dépenses personnels n'affectent pas la balance entre utilisateurs
-                // sauf si on veut les inclure dans un calcul global
-            }
-        }
         
         return balances;
     }
@@ -1322,28 +1385,101 @@
         copyToClipboard(code, 'Code copié ! 📋');
     }
     
+    // Compresser une chaîne (algorithme LZ simple)
+    function compressData(data) {
+        try {
+            const jsonString = JSON.stringify(data);
+            // Encodage simple avec compression basique
+            const compressed = btoa(unescape(encodeURIComponent(jsonString)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+            return compressed;
+        } catch (e) {
+            console.error('Erreur compression:', e);
+            return null;
+        }
+    }
+    
+    // Décompresser une chaîne
+    function decompressData(compressed) {
+        try {
+            // Restaurer les caractères base64
+            let base64 = compressed
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+            // Ajouter le padding si nécessaire
+            while (base64.length % 4) {
+                base64 += '=';
+            }
+            const jsonString = decodeURIComponent(escape(atob(base64)));
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.error('Erreur décompression:', e);
+            return null;
+        }
+    }
+    
     // Copier le lien de partage
     function copyShareLink() {
-        const dataToShare = {
-            groupId: getGroupId(),
-            users: appData.users,
-            commonExpenses: appData.commonExpenses,
-            transfers: appData.transfers || [],
-            exportDate: new Date().toISOString(),
-            version: '2.0'
+        // Créer une version minimale des données (sans les dates inutiles)
+        const minimalData = {
+            g: getGroupId(), // groupId raccourci
+            u: {}, // users
+            c: [], // commonExpenses
+            t: []  // transfers
         };
         
-        const jsonString = JSON.stringify(dataToShare);
-        const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
-        const shareUrl = `${window.location.origin}${window.location.pathname}?import=${base64Data}`;
+        // Compresser les utilisateurs
+        for (const userId in appData.users) {
+            const user = appData.users[userId];
+            const shortId = userId === 'commun' ? 'c' : userId.replace('user_', 'u');
+            minimalData.u[shortId] = {
+                n: user.name,
+                i: user.incomes.map(i => ({ n: i.name, a: i.amount })),
+                e: user.expenses.map(e => ({ n: e.name, a: e.amount }))
+            };
+        }
         
-        // Vérifier si le lien n'est pas trop long
-        if (shareUrl.length > 2000) {
-            alert('⚠️ Trop de données pour un lien.\n\nUtilisez "Télécharger" pour créer un fichier de sauvegarde.');
+        // Compresser les dépenses communes
+        minimalData.c = appData.commonExpenses.map(exp => ({
+            n: exp.name,
+            a: exp.amount,
+            p: exp.paidBy ? exp.paidBy.replace('user_', 'u') : null,
+            ps: exp.participants.map(p => p.replace('user_', 'u'))
+        }));
+        
+        // Compresser les virements
+        if (appData.transfers) {
+            minimalData.t = appData.transfers.map(t => ({
+                d: t.description,
+                a: t.amount,
+                f: t.from.replace('user_', 'u'),
+                o: t.to.replace('user_', 'u')
+            }));
+        }
+        
+        const compressed = compressData(minimalData);
+        if (!compressed) {
+            alert('❌ Erreur lors de la création du lien.');
             return;
         }
         
-        copyToClipboard(shareUrl, 'Lien de partage copié ! 🔗');
+        const shareUrl = `${window.location.origin}${window.location.pathname}?i=${compressed}`;
+        
+        // Vérifier la longueur
+        if (shareUrl.length > 2000) {
+            alert(
+                '⚠️ Trop de données pour un lien court.\n\n' +
+                `Longueur actuelle : ${shareUrl.length} caractères\n\n` +
+                'Options :\n' +
+                '• Utilisez "Télécharger" pour créer un fichier\n' +
+                '• Ou partagez le code du groupe et synchronisez manuellement'
+            );
+            return;
+        }
+        
+        copyToClipboard(shareUrl, `Lien copié ! (${shareUrl.length} car.) 🔗`);
     }
     
     // Fonction utilitaire pour copier dans le presse-papier
@@ -1484,13 +1620,75 @@
     // Vérifier s'il y a des données à importer dans l'URL
     function checkUrlImport() {
         const urlParams = new URLSearchParams(window.location.search);
-        const importData = urlParams.get('import');
         
-        if (importData) {
-            try {
-                const jsonString = decodeURIComponent(escape(atob(importData)));
-                const importedData = JSON.parse(jsonString);
+        // Nouveau format compressé (paramètre 'i')
+        const compressedData = urlParams.get('i');
+        // Ancien format (paramètre 'import')
+        const legacyData = urlParams.get('import');
+        
+        let importedData = null;
+        
+        if (compressedData) {
+            // Nouveau format compressé
+            const minData = decompressData(compressedData);
+            if (minData) {
+                // Reconstruire les données complètes
+                importedData = {
+                    groupId: minData.g,
+                    users: {},
+                    commonExpenses: [],
+                    transfers: []
+                };
                 
+                // Reconstruire les utilisateurs
+                for (const shortId in minData.u) {
+                    const userData = minData.u[shortId];
+                    const fullId = shortId === 'c' ? 'commun' : shortId.replace('u', 'user_');
+                    importedData.users[fullId] = {
+                        name: userData.n,
+                        incomes: (userData.i || []).map(i => ({ 
+                            name: i.n, 
+                            amount: i.a, 
+                            date: new Date().toISOString() 
+                        })),
+                        expenses: (userData.e || []).map(e => ({ 
+                            name: e.n, 
+                            amount: e.a, 
+                            date: new Date().toISOString() 
+                        }))
+                    };
+                }
+                
+                // Reconstruire les dépenses communes
+                importedData.commonExpenses = (minData.c || []).map(exp => ({
+                    name: exp.n,
+                    amount: exp.a,
+                    paidBy: exp.p ? exp.p.replace('u', 'user_') : null,
+                    participants: exp.ps.map(p => p === 'c' ? 'commun' : p.replace('u', 'user_')),
+                    date: new Date().toISOString()
+                }));
+                
+                // Reconstruire les virements
+                importedData.transfers = (minData.t || []).map(t => ({
+                    description: t.d,
+                    amount: t.a,
+                    from: t.f.replace('u', 'user_'),
+                    to: t.o.replace('u', 'user_'),
+                    date: new Date().toISOString()
+                }));
+            }
+        } else if (legacyData) {
+            // Ancien format base64 standard
+            try {
+                const jsonString = decodeURIComponent(escape(atob(legacyData)));
+                importedData = JSON.parse(jsonString);
+            } catch (e) {
+                console.error('Erreur parsing ancien format:', e);
+            }
+        }
+        
+        if (importedData) {
+            try {
                 const userCount = Object.keys(importedData.users).filter(id => id !== 'commun').length;
                 const expenseCount = (importedData.commonExpenses || []).length;
                 
@@ -1752,31 +1950,108 @@ function syncTheme() {
         input.click();
     }
 
-    function confirmReset() {
-        confirmCallback = () => {
-    if (confirm('Cette action supprimera TOUTES les données. Êtes-vous vraiment sûr ?')) {
-        // Conserver le thème préféré
-        const preferredTheme = localStorage.getItem('preferredTheme') || 'dark';
+// Vider le cache et recharger l'application
+    async function clearCacheAndReload() {
+        const confirmed = confirm(
+            '🔄 Vider le cache de l\'application ?\n\n' +
+            '• Cela forcera le téléchargement de la dernière version\n' +
+            '• Vos données (dépenses, utilisateurs) seront CONSERVÉES\n' +
+            '• L\'application va se recharger\n\n' +
+            'Continuer ?'
+        );
         
-        appData = {
-            users: {
-                'commun': {
-                    name: 'Commun',
-                    incomes: [],
-                    expenses: []
+        if (!confirmed) return;
+        
+        try {
+            // 1. Désinscrire tous les Service Workers
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (const registration of registrations) {
+                    await registration.unregister();
+                    console.log('Service Worker désinscrit');
                 }
-            },
-            commonExpenses: [],
-            currentTab: 'dashboard',
-            theme: preferredTheme // Utiliser le thème préféré
-        };
-        saveData();
-        renderApp();
-        location.reload(); // Recharger la page pour réinitialiser complètement
-        closeModal('settingsModal');
+            }
+            
+            // 2. Vider tous les caches
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (const cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                    console.log('Cache supprimé:', cacheName);
+                }
+            }
+            
+            // 3. Message de succès
+            showSuccessMessage('Cache vidé ! Rechargement...');
+            
+            // 4. Recharger la page après un court délai
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Erreur lors du vidage du cache:', error);
+            alert('❌ Erreur lors du vidage du cache.\n\nEssayez de vider manuellement le cache de votre navigateur.');
+        }
     }
-};
-        showConfirm('Voulez-vous vraiment réinitialiser toutes les données ?');
+    
+    // Réinitialisation complète (supprime aussi les données)
+    async function fullReset() {
+        const confirmed = confirm(
+            '⚠️ ATTENTION : Réinitialisation complète !\n\n' +
+            'Cela va supprimer :\n' +
+            '• Toutes vos données (dépenses, utilisateurs)\n' +
+            '• Le cache de l\'application\n' +
+            '• Tous les paramètres\n\n' +
+            'Cette action est IRRÉVERSIBLE !\n\n' +
+            'Êtes-vous vraiment sûr ?'
+        );
+        
+        if (!confirmed) return;
+        
+        // Double confirmation
+        const doubleConfirm = confirm('Dernière chance !\n\nTout sera effacé. Confirmer ?');
+        if (!doubleConfirm) return;
+        
+        try {
+            // 1. Vider localStorage
+            localStorage.clear();
+            
+            // 2. Vider sessionStorage
+            sessionStorage.clear();
+            
+            // 3. Désinscrire les Service Workers
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (const registration of registrations) {
+                    await registration.unregister();
+                }
+            }
+            
+            // 4. Vider les caches
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (const cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                }
+            }
+            
+            // 5. Recharger
+            showSuccessMessage('Tout a été effacé ! Rechargement...');
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Erreur:', error);
+            // Forcer le rechargement quand même
+            localStorage.clear();
+            window.location.reload(true);
+        }
+    }
+	
+    function confirmReset() {
+        fullReset();
     }
 
     // Gestion des modals avec historique
