@@ -1411,3 +1411,70 @@ select.input {
         padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
     }
 }
+
+/* ===========================
+   STATISTIQUES
+   =========================== */
+.stats-period-btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.stats-period-btn.active {
+    background: var(--primary);
+    color: white;
+    border-radius: 10px;
+    margin: 4px;
+}
+
+.stats-period-btn:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+.stats-category-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+    border: 1px solid var(--border);
+}
+
+.stats-category-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.stats-category-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.stats-category-info {
+    flex: 1;
+}
+
+.stats-category-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.stats-category-amount {
+    font-size: 1.125rem;
+    font-weight: 700;
+}

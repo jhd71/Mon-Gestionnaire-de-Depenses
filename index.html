@@ -403,15 +403,64 @@
 
     <!-- Modal statistiques -->
     <div class="modal" id="statsModal">
-        <div class="modal-content">
-            <div class="modal-header">Statistiques globales</div>
-            <div class="modal-body">
-                <div id="statsContent" style="display: grid; gap: 1rem;">
-                    <!-- Le contenu sera généré dynamiquement -->
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <span class="material-icons" style="margin-right: 0.5rem;">insights</span>
+                Statistiques
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <!-- Filtres période -->
+                <div style="display: flex; background: var(--bg-tertiary); border-radius: 12px; margin: 1rem; overflow: hidden;">
+                    <button class="stats-period-btn active" onclick="setStatsPeriod('month')" id="periodMonth">Mois</button>
+                    <button class="stats-period-btn" onclick="setStatsPeriod('year')" id="periodYear">Année</button>
+                    <button class="stats-period-btn" onclick="setStatsPeriod('all')" id="periodAll">Tous</button>
+                </div>
+                
+                <!-- Navigation mois/année -->
+                <div id="statsNavigation" style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                    <button onclick="navigateStats(-1)" style="background: var(--bg-tertiary); border: none; color: var(--text-primary); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-icons">chevron_left</span>
+                    </button>
+                    <span id="statsPeriodLabel" style="font-weight: 600; min-width: 150px; text-align: center;">décembre 2025</span>
+                    <button onclick="navigateStats(1)" style="background: var(--bg-tertiary); border: none; color: var(--text-primary); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-icons">chevron_right</span>
+                    </button>
+                </div>
+                
+                <!-- Graphique et total -->
+                <div style="background: var(--bg-secondary); border-radius: 16px; margin: 0 1rem 1rem; padding: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 1.5rem;">
+                        <!-- Graphique camembert -->
+                        <div id="pieChartContainer" style="width: 150px; height: 150px; flex-shrink: 0;">
+                            <svg id="pieChart" viewBox="0 0 100 100" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+                                <!-- Généré dynamiquement -->
+                            </svg>
+                        </div>
+                        <!-- Légende -->
+                        <div style="flex: 1;">
+                            <div id="statsTotal" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--primary);">Total: 0 €</div>
+                            <div id="statsLegend" style="display: flex; flex-direction: column; gap: 0.375rem; font-size: 0.875rem;">
+                                <!-- Généré dynamiquement -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filtre groupe/utilisateur -->
+                <div style="margin: 0 1rem 1rem;">
+                    <select class="input" id="statsUserFilter" onchange="updateStats()" style="padding: 0.75rem 1rem;">
+                        <option value="all">Pour le groupe</option>
+                        <!-- Options générées dynamiquement -->
+                    </select>
+                </div>
+                
+                <!-- Liste des dépenses par catégorie -->
+                <div id="statsCategoryList" style="margin: 0 1rem 1rem;">
+                    <!-- Généré dynamiquement -->
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn" onclick="closeModal('statsModal')">Fermer</button>
+                <button class="btn" onclick="closeModal('statsModal')" style="flex: 1;">Fermer</button>
             </div>
         </div>
     </div>
@@ -2100,100 +2149,360 @@ function syncTheme() {
         }
     });
 
-    // Statistiques
-    function showStats() {
-        const statsContent = document.getElementById('statsContent');
-        
-        // Calculer les statistiques globales
-        let totalRevenue = 0;
-        let totalExpenses = 0;
-        let userStats = [];
-        
-        // Statistiques par utilisateur
-        for (const userId in appData.users) {
-            const user = appData.users[userId];
-            const userRevenue = user.incomes.reduce((sum, item) => sum + item.amount, 0);
-            const userExpenses = user.expenses.reduce((sum, item) => sum + item.amount, 0);
-            
-            // Part des dépenses communes
-            let commonShare = 0;
-            if (userId !== 'commun') {
-                appData.commonExpenses.forEach(expense => {
-                    if (expense.participants.includes(userId)) {
-                        commonShare += expense.amount / expense.participants.length;
-                    }
-                });
+    // ========== STATISTIQUES AVANCÉES ==========
+    
+    let statsCurrentDate = new Date();
+    let statsCurrentPeriod = 'month'; // 'month', 'year', 'all'
+    
+    // Couleurs pour le graphique
+    const chartColors = [
+        '#f59e0b', // Orange
+        '#ef4444', // Rouge
+        '#ec4899', // Rose
+        '#8b5cf6', // Violet
+        '#3b82f6', // Bleu
+        '#10b981', // Vert
+        '#14b8a6', // Teal
+        '#6366f1', // Indigo
+        '#f97316', // Orange foncé
+        '#84cc16', // Lime
+        '#06b6d4', // Cyan
+        '#a855f7', // Purple
+    ];
+    
+    // Icônes par mot-clé dans le nom de la dépense
+    const categoryIcons = {
+        'loyer': '🏠',
+        'charge': '🏠',
+        'électricité': '⚡',
+        'edf': '⚡',
+        'gaz': '🔥',
+        'eau': '💧',
+        'internet': '📶',
+        'freebox': '📶',
+        'box': '📶',
+        'téléphone': '📱',
+        'mobile': '📱',
+        'sfr': '📱',
+        'orange': '📱',
+        'bouygues': '📱',
+        'assurance': '🛡️',
+        'mutuelle': '🏥',
+        'santé': '🏥',
+        'médecin': '👨‍⚕️',
+        'pharmacie': '💊',
+        'courses': '🛒',
+        'supermarché': '🛒',
+        'leclerc': '🛒',
+        'carrefour': '🛒',
+        'auchan': '🛒',
+        'lidl': '🛒',
+        'restaurant': '🍽️',
+        'resto': '🍽️',
+        'pizza': '🍕',
+        'mcdo': '🍔',
+        'essence': '⛽',
+        'carburant': '⛽',
+        'voiture': '🚗',
+        'auto': '🚗',
+        'parking': '🅿️',
+        'transport': '🚌',
+        'train': '🚆',
+        'sncf': '🚆',
+        'avion': '✈️',
+        'voyage': '✈️',
+        'hôtel': '🏨',
+        'netflix': '🎬',
+        'spotify': '🎵',
+        'amazon': '📦',
+        'abonnement': '📋',
+        'crédit': '💳',
+        'banque': '🏦',
+        'impôt': '📋',
+        'taxe': '📋',
+        'vêtement': '👕',
+        'shopping': '🛍️',
+        'cadeau': '🎁',
+        'octopus': '🐙',
+        'default': '💰'
+    };
+    
+    function getIconForExpense(name) {
+        const lowerName = name.toLowerCase();
+        for (const [keyword, icon] of Object.entries(categoryIcons)) {
+            if (lowerName.includes(keyword)) {
+                return icon;
             }
-            
-            userStats.push({
-                name: user.name,
-                revenue: userRevenue,
-                expenses: userExpenses + commonShare,
-                balance: userRevenue - userExpenses - commonShare
-            });
-            
-            totalRevenue += userRevenue;
-            totalExpenses += userExpenses + (userId === 'commun' ? 0 : commonShare);
+        }
+        return categoryIcons.default;
+    }
+    
+    function showStats() {
+        // Remplir le filtre utilisateur
+        const userFilter = document.getElementById('statsUserFilter');
+        userFilter.innerHTML = '<option value="all">Pour le groupe</option>';
+        
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                const option = document.createElement('option');
+                option.value = userId;
+                option.textContent = appData.users[userId].name;
+                userFilter.appendChild(option);
+            }
         }
         
-        // Total des dépenses communes
-        const totalCommonExpenses = appData.commonExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+        // Réinitialiser la date à aujourd'hui
+        statsCurrentDate = new Date();
+        statsCurrentPeriod = 'month';
         
-        // Générer le HTML
-        statsContent.innerHTML = `
-            <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
-                <h3 style="margin-bottom: 1rem;">Vue d'ensemble</h3>
-                <div style="display: grid; gap: 0.5rem;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Total des revenus :</span>
-                        <span style="color: var(--success); font-weight: bold;">+${totalRevenue.toFixed(2)}€</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Total des dépenses :</span>
-                        <span style="color: var(--danger); font-weight: bold;">-${totalExpenses.toFixed(2)}€</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Dépenses communes :</span>
-                        <span style="color: var(--warning); font-weight: bold;">${totalCommonExpenses.toFixed(2)}€</span>
-                    </div>
-                    <hr style="border-color: var(--border);">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Solde global :</span>
-                        <span style="color: var(--primary); font-weight: bold; font-size: 1.25rem;">${(totalRevenue - totalExpenses).toFixed(2)}€</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
-                <h3 style="margin-bottom: 1rem;">Par utilisateur</h3>
-                <div style="display: grid; gap: 0.75rem;">
-                    ${userStats.map(user => `
-                        <div style="padding: 0.5rem; background-color: var(--bg-primary); border-radius: 6px;">
-                            <strong>${user.name}</strong>
-                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.25rem; margin-top: 0.5rem; font-size: 0.875rem;">
-                                <span>Revenus :</span>
-                                <span style="color: var(--success);">+${user.revenue.toFixed(2)}€</span>
-                                <span>Dépenses :</span>
-                                <span style="color: var(--danger);">-${user.expenses.toFixed(2)}€</span>
-                                <span>Solde :</span>
-                                <span style="color: var(--primary); font-weight: bold;">${user.balance.toFixed(2)}€</span>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            
-            <div style="background-color: var(--bg-secondary); padding: 1rem; border-radius: 8px;">
-                <h3 style="margin-bottom: 1rem;">Informations</h3>
-                <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                    <p>Nombre d'utilisateurs : ${Object.keys(appData.users).length - 1}</p>
-                    <p>Nombre de dépenses communes : ${appData.commonExpenses.length}</p>
-                    <p>Dernière sauvegarde : ${new Date().toLocaleString('fr-FR')}</p>
-                </div>
-            </div>
-        `;
+        // Mettre à jour les boutons de période
+        document.querySelectorAll('.stats-period-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('periodMonth').classList.add('active');
         
+        updateStats();
         openModal('statsModal');
+    }
+    
+    function setStatsPeriod(period) {
+        statsCurrentPeriod = period;
+        
+        // Mettre à jour les boutons
+        document.querySelectorAll('.stats-period-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('period' + period.charAt(0).toUpperCase() + period.slice(1)).classList.add('active');
+        
+        // Afficher/masquer la navigation
+        const nav = document.getElementById('statsNavigation');
+        if (period === 'all') {
+            nav.style.display = 'none';
+        } else {
+            nav.style.display = 'flex';
+        }
+        
+        updateStats();
+    }
+    
+    function navigateStats(direction) {
+        if (statsCurrentPeriod === 'month') {
+            statsCurrentDate.setMonth(statsCurrentDate.getMonth() + direction);
+        } else if (statsCurrentPeriod === 'year') {
+            statsCurrentDate.setFullYear(statsCurrentDate.getFullYear() + direction);
+        }
+        updateStats();
+    }
+    
+    function updateStats() {
+        const userFilter = document.getElementById('statsUserFilter').value;
+        
+        // Mettre à jour le label de période
+        const periodLabel = document.getElementById('statsPeriodLabel');
+        if (statsCurrentPeriod === 'month') {
+            periodLabel.textContent = statsCurrentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        } else if (statsCurrentPeriod === 'year') {
+            periodLabel.textContent = statsCurrentDate.getFullYear().toString();
+        } else {
+            periodLabel.textContent = 'Toutes les dépenses';
+        }
+        
+        // Filtrer les dépenses
+        const expenses = getFilteredExpenses(userFilter);
+        
+        // Grouper par nom (catégorie)
+        const categories = {};
+        let total = 0;
+        
+        expenses.forEach(exp => {
+            const name = exp.name;
+            if (!categories[name]) {
+                categories[name] = {
+                    name: name,
+                    amount: 0,
+                    icon: getIconForExpense(name)
+                };
+            }
+            categories[name].amount += exp.amount;
+            total += exp.amount;
+        });
+        
+        // Convertir en tableau et trier par montant décroissant
+        const sortedCategories = Object.values(categories).sort((a, b) => b.amount - a.amount);
+        
+        // Mettre à jour le total
+        document.getElementById('statsTotal').innerHTML = `<span style="text-decoration: underline;">Total: ${total.toFixed(0)} €</span>`;
+        
+        // Générer le graphique camembert
+        generatePieChart(sortedCategories, total);
+        
+        // Générer la légende
+        generateLegend(sortedCategories, total);
+        
+        // Générer la liste des catégories
+        generateCategoryList(sortedCategories);
+    }
+    
+    function getFilteredExpenses(userFilter) {
+        let expenses = [];
+        
+        // Collecter les dépenses communes
+        appData.commonExpenses.forEach(exp => {
+            // Vérifier le filtre utilisateur
+            if (userFilter !== 'all' && !exp.participants.includes(userFilter)) {
+                return;
+            }
+            
+            // Vérifier la période
+            if (!isInPeriod(exp.date)) {
+                return;
+            }
+            
+            // Si filtre utilisateur, ne prendre que sa part
+            let amount = exp.amount;
+            if (userFilter !== 'all') {
+                amount = exp.amount / exp.participants.length;
+            }
+            
+            expenses.push({
+                name: exp.name,
+                amount: amount,
+                date: exp.date
+            });
+        });
+        
+        // Collecter les dépenses personnelles
+        for (const userId in appData.users) {
+            if (userId === 'commun') continue;
+            
+            // Si filtre utilisateur actif, ne prendre que ses dépenses
+            if (userFilter !== 'all' && userFilter !== userId) continue;
+            
+            const user = appData.users[userId];
+            user.expenses.forEach(exp => {
+                if (!isInPeriod(exp.date)) return;
+                
+                expenses.push({
+                    name: exp.name,
+                    amount: exp.amount,
+                    date: exp.date
+                });
+            });
+        }
+        
+        return expenses;
+    }
+    
+    function isInPeriod(dateStr) {
+        if (statsCurrentPeriod === 'all') return true;
+        if (!dateStr) return false;
+        
+        const date = new Date(dateStr);
+        
+        if (statsCurrentPeriod === 'month') {
+            return date.getMonth() === statsCurrentDate.getMonth() &&
+                   date.getFullYear() === statsCurrentDate.getFullYear();
+        } else if (statsCurrentPeriod === 'year') {
+            return date.getFullYear() === statsCurrentDate.getFullYear();
+        }
+        
+        return true;
+    }
+    
+    function generatePieChart(categories, total) {
+        const svg = document.getElementById('pieChart');
+        
+        if (categories.length === 0 || total === 0) {
+            svg.innerHTML = `
+                <circle cx="50" cy="50" r="45" fill="var(--bg-tertiary)" />
+                <text x="50" y="50" text-anchor="middle" dominant-baseline="middle" fill="var(--text-secondary)" font-size="8" transform="rotate(90 50 50)">Aucune donnée</text>
+            `;
+            return;
+        }
+        
+        let html = '';
+        let currentAngle = 0;
+        
+        categories.forEach((cat, index) => {
+            const percentage = cat.amount / total;
+            const angle = percentage * 360;
+            const color = chartColors[index % chartColors.length];
+            
+            // Créer un arc de cercle
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + angle;
+            
+            const x1 = 50 + 45 * Math.cos((startAngle * Math.PI) / 180);
+            const y1 = 50 + 45 * Math.sin((startAngle * Math.PI) / 180);
+            const x2 = 50 + 45 * Math.cos((endAngle * Math.PI) / 180);
+            const y2 = 50 + 45 * Math.sin((endAngle * Math.PI) / 180);
+            
+            const largeArc = angle > 180 ? 1 : 0;
+            
+            if (categories.length === 1) {
+                // Si une seule catégorie, dessiner un cercle complet
+                html += `<circle cx="50" cy="50" r="45" fill="${color}" />`;
+            } else {
+                html += `<path d="M 50 50 L ${x1} ${y1} A 45 45 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${color}" />`;
+            }
+            
+            currentAngle = endAngle;
+        });
+        
+        svg.innerHTML = html;
+    }
+    
+    function generateLegend(categories, total) {
+        const legend = document.getElementById('statsLegend');
+        
+        if (categories.length === 0) {
+            legend.innerHTML = '<div style="color: var(--text-secondary);">Aucune dépense</div>';
+            return;
+        }
+        
+        // Limiter à 5 catégories dans la légende
+        const displayCategories = categories.slice(0, 5);
+        
+        legend.innerHTML = displayCategories.map((cat, index) => {
+            const color = chartColors[index % chartColors.length];
+            return `
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></div>
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cat.name}</span>
+                </div>
+            `;
+        }).join('');
+        
+        if (categories.length > 5) {
+            legend.innerHTML += `<div style="color: var(--text-secondary); font-size: 0.75rem;">+ ${categories.length - 5} autres</div>`;
+        }
+    }
+    
+    function generateCategoryList(categories) {
+        const list = document.getElementById('statsCategoryList');
+        
+        if (categories.length === 0) {
+            list.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📊</div>
+                    <div>Aucune dépense pour cette période</div>
+                </div>
+            `;
+            return;
+        }
+        
+        list.innerHTML = categories.map((cat, index) => {
+            const color = chartColors[index % chartColors.length];
+            return `
+                <div class="stats-category-item">
+                    <div class="stats-category-icon" style="background: ${color}20; color: ${color};">
+                        ${cat.icon}
+                    </div>
+                    <div class="stats-category-info">
+                        <div class="stats-category-name">${cat.name}</div>
+                    </div>
+                    <div class="stats-category-amount" style="color: var(--text-primary);">
+                        ${cat.amount.toFixed(2).replace('.', ',')} €
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
 // Mettre à jour le texte du bouton PIN dans les paramètres
