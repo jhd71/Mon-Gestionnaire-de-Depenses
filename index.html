@@ -1448,50 +1448,81 @@
             const fromInitial = fromName.charAt(0).toUpperCase();
             
             return `
-                <div style="
-                    background: var(--bg-secondary);
-                    border-radius: 16px;
-                    padding: 1.25rem;
-                    margin: 0.75rem;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-                    border: 1px solid var(--border);
-                ">
+                <div class="debt-card">
                     <div style="display: flex; align-items: center; gap: 1rem;">
-                        <div style="
-                            width: 48px;
-                            height: 48px;
-                            border-radius: 50%;
-                            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            font-size: 1.25rem;
-                            font-weight: 700;
-                            color: white;
-                            flex-shrink: 0;
-                        ">${fromInitial}</div>
+                        <div class="debt-avatar">${fromInitial}</div>
                         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                             <span style="font-weight: 700; color: var(--danger);">${fromName}</span>
                             <span style="font-size: 0.75rem; color: var(--text-secondary);">doit payer à</span>
                             <span style="font-weight: 700; color: var(--success);">${toName}</span>
                         </div>
                     </div>
-                    <div style="
-                        font-size: 1.5rem;
-                        font-weight: 800;
-                        color: var(--primary);
-                        background: rgba(59, 130, 246, 0.1);
-                        padding: 0.5rem 1rem;
-                        border-radius: 12px;
-                    ">${debt.amount.toFixed(2)}€</div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+                        <div class="debt-amount">${debt.amount.toFixed(2)}€</div>
+                        <button class="btn-paid" onclick="markAsPaid('${debt.from}', '${debt.to}', ${debt.amount.toFixed(2)})">
+                            ✅ C'est payé !
+                        </button>
+                    </div>
                 </div>
             `;
         }).join('');
     }
     
+	// Marquer une dette comme payée
+    function markAsPaid(fromUserId, toUserId, amount) {
+        const fromName = appData.users[fromUserId]?.name || 'Inconnu';
+        const toName = appData.users[toUserId]?.name || 'Inconnu';
+        
+        const confirmed = confirm(
+            `✅ Confirmer le remboursement ?\n\n` +
+            `${fromName} a payé ${amount.toFixed(2)}€ à ${toName}\n\n` +
+            `Un virement sera créé pour équilibrer les comptes.`
+        );
+        
+        if (!confirmed) return;
+        
+        // Initialiser le tableau des virements s'il n'existe pas
+        if (!appData.transfers) {
+            appData.transfers = [];
+        }
+        
+        // Créer un virement de remboursement
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        
+        appData.transfers.push({
+            description: `Remboursement du ${dateStr}`,
+            amount: amount,
+            from: toUserId,  // Inversé : celui qui reçoit l'argent le "détient"
+            to: fromUserId,   // Celui qui a payé récupère son dû
+            date: today.toISOString(),
+            isSettlement: true  // Marquer comme remboursement
+        });
+        
+        saveData();
+        renderApp();
+        showNotification(`✅ ${fromName} a remboursé ${amount.toFixed(2)}€ à ${toName}`, 'success');
+    }
+    
+    // Annuler un remboursement (réactiver la dette)
+    function cancelSettlement(index) {
+        const transfer = appData.transfers[index];
+        if (!transfer) return;
+        
+        const confirmed = confirm(
+            `🔄 Annuler ce remboursement ?\n\n` +
+            `"${transfer.description}" - ${transfer.amount.toFixed(2)}€\n\n` +
+            `La dette sera réactivée.`
+        );
+        
+        if (!confirmed) return;
+        
+        appData.transfers.splice(index, 1);
+        saveData();
+        renderApp();
+        showNotification('🔄 Remboursement annulé, dette réactivée', 'info');
+    }
+	
     // Afficher la liste des virements
     function renderTransfers() {
         const container = document.getElementById('transfers-list');
@@ -1510,16 +1541,29 @@
         container.innerHTML = appData.transfers.map((transfer, index) => {
             const fromName = appData.users[transfer.from]?.name || 'Inconnu';
             const toName = appData.users[transfer.to]?.name || 'Inconnu';
+            const isSettlement = transfer.isSettlement === true;
+            
+            // Icône et style différent pour les remboursements
+            const icon = isSettlement ? '✅' : '💸';
+            const itemClass = isSettlement ? 'item settlement-item' : 'item transfer-item';
+            const metaText = isSettlement 
+                ? `${toName} a remboursé ${fromName}`
+                : `${fromName} détient l'argent de ${toName}`;
+            
             return `
-                <div class="item transfer-item">
-                    <div class="item-icon transfer">💸</div>
+                <div class="${itemClass}">
+                    <div class="item-icon ${isSettlement ? 'settlement' : 'transfer'}">${icon}</div>
                     <div class="item-info">
                         <div class="item-name">${transfer.description}</div>
-                        <div class="item-meta">${fromName} détient l'argent de ${toName}</div>
+                        <div class="item-meta">${metaText}</div>
+                        ${isSettlement ? `<div class="item-meta" style="font-size: 0.7rem; color: var(--success);">Cliquez sur 🔄 pour annuler</div>` : ''}
                     </div>
                     <div class="item-actions">
-                        <span class="item-amount transfer">${transfer.amount.toFixed(2)}€</span>
-                        <button class="btn-delete" onclick="deleteTransfer(${index})">×</button>
+                        <span class="item-amount ${isSettlement ? 'settlement' : 'transfer'}">${transfer.amount.toFixed(2)}€</span>
+                        ${isSettlement 
+                            ? `<button class="btn-undo" onclick="cancelSettlement(${index})" title="Annuler le remboursement">🔄</button>`
+                            : `<button class="btn-delete" onclick="deleteTransfer(${index})">×</button>`
+                        }
                     </div>
                 </div>
             `;
