@@ -468,6 +468,49 @@
     <script>
     // État global de l'application
 	let currentTab = 'dashboard';
+	
+	// Fonction de notification
+    function showNotification(message, type = 'info') {
+        // Supprimer une notification existante
+        const existing = document.querySelector('.app-notification');
+        if (existing) existing.remove();
+        
+        const notification = document.createElement('div');
+        notification.className = 'app-notification';
+        
+        // Couleurs selon le type
+        let bgColor = '#3b82f6'; // info (bleu)
+        if (type === 'success') bgColor = '#10b981'; // vert
+        if (type === 'error') bgColor = '#ef4444'; // rouge
+        if (type === 'warning') bgColor = '#f59e0b'; // orange
+        
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: ${bgColor};
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 500;
+            z-index: 10000;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease;
+            max-width: 90%;
+            text-align: center;
+        `;
+        
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        // Disparaît après 3 secondes
+        setTimeout(() => {
+            notification.style.animation = 'slideDown 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+	
     let appData = {
         users: {
             'commun': {
