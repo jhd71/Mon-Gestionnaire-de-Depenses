@@ -455,6 +455,10 @@
             <span class="material-icons">delete_forever</span>
             Réinitialiser tout
         </button>
+        <button class="btn" onclick="showAbout()" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+            <span class="material-icons">info</span>
+            À propos
+        </button>
     </div>
 </div>
             <div class="modal-footer">
@@ -2231,6 +2235,12 @@ function syncTheme() {
 }
 
     // Paramètres
+	// Afficher la page À propos
+    function showAbout() {
+        closeModal('settingsModal');
+        openModal('aboutModal');
+    }
+	
     function openSettings() {
 		updatePinButtonText();
         openModal('settingsModal');
@@ -2340,42 +2350,83 @@ function syncTheme() {
         if (!confirmed) return;
         
         // Double confirmation
-        const doubleConfirm = confirm('Dernière chance !\n\nTout sera effacé. Confirmer ?');
+        const doubleConfirm = confirm('🚨 Dernière chance !\n\nTout sera définitivement effacé.\n\nConfirmer la suppression ?');
         if (!doubleConfirm) return;
         
         try {
-            // 1. Vider localStorage
-            localStorage.clear();
+            // 1. Réinitialiser appData en mémoire
+            appData = {
+                users: {
+                    'commun': {
+                        name: 'Commun',
+                        incomes: [],
+                        expenses: []
+                    }
+                },
+                commonExpenses: [],
+                transfers: [],
+                currentTab: 'dashboard',
+                theme: 'dark'
+            };
             
-            // 2. Vider sessionStorage
+            // 2. Supprimer TOUTES les clés du localStorage
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                keysToRemove.push(localStorage.key(i));
+            }
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+                console.log('Supprimé localStorage:', key);
+            });
+            
+            // 3. Vider sessionStorage
             sessionStorage.clear();
+            console.log('sessionStorage vidé');
             
-            // 3. Désinscrire les Service Workers
+            // 4. Désinscrire les Service Workers
             if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 for (const registration of registrations) {
                     await registration.unregister();
+                    console.log('Service Worker désinscrit');
                 }
             }
             
-            // 4. Vider les caches
+            // 5. Vider tous les caches
             if ('caches' in window) {
                 const cacheNames = await caches.keys();
                 for (const cacheName of cacheNames) {
                     await caches.delete(cacheName);
+                    console.log('Cache supprimé:', cacheName);
                 }
             }
             
-            // 5. Recharger
-            showSuccessMessage('Tout a été effacé ! Rechargement...');
-            setTimeout(() => {
-                window.location.reload(true);
-            }, 1000);
+            // 6. Vider IndexedDB si utilisé
+            if ('indexedDB' in window) {
+                const databases = await indexedDB.databases?.() || [];
+                for (const db of databases) {
+                    if (db.name) {
+                        indexedDB.deleteDatabase(db.name);
+                        console.log('IndexedDB supprimé:', db.name);
+                    }
+                }
+            }
+            
+            console.log('✅ Réinitialisation complète effectuée');
+            
+            // 7. Message et rechargement forcé
+            alert('✅ Toutes les données ont été supprimées !\n\nL\'application va se recharger.');
+            
+            // Forcer le rechargement sans cache
+            window.location.href = window.location.pathname + '?reset=' + Date.now();
             
         } catch (error) {
-            console.error('Erreur:', error);
-            // Forcer le rechargement quand même
+            console.error('Erreur lors de la réinitialisation:', error);
+            
+            // Plan B : forcer quand même
             localStorage.clear();
+            sessionStorage.clear();
+            alert('Réinitialisation effectuée. L\'application va se recharger.');
             window.location.reload(true);
         }
     }
@@ -3255,6 +3306,144 @@ function showSuccessMessage(message) {
         </div>
     </div>
 </div>
+
+<!-- Modal À propos -->
+    <div class="modal" id="aboutModal">
+        <div class="modal-content" style="max-width: 600px; max-height: 90vh;">
+            <div class="modal-header">
+                <span class="material-icons" style="margin-right: 0.5rem;">info</span>
+                À propos
+            </div>
+            <div class="modal-body" style="overflow-y: auto; max-height: 70vh;">
+                
+                <!-- En-tête app -->
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <div style="font-size: 4rem; margin-bottom: 0.5rem;">💰</div>
+                    <h2 style="margin: 0; font-size: 1.5rem;">Gestionnaire de Dépenses</h2>
+                    <p style="color: var(--text-secondary); margin: 0.5rem 0;">Version 2.0</p>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Application PWA gratuite et sans publicité</p>
+                </div>
+                
+                <!-- Description -->
+                <div class="about-section">
+                    <h3 class="about-title">📱 Présentation</h3>
+                    <p>Application web progressive (PWA) de gestion de dépenses partagées, inspirée de Tricount. Idéale pour les couples, colocataires ou groupes d'amis souhaitant gérer leurs finances communes.</p>
+                </div>
+                
+                <!-- Fonctionnalités principales -->
+                <div class="about-section">
+                    <h3 class="about-title">✨ Fonctionnalités principales</h3>
+                    <div class="about-features">
+                        <div class="about-feature-item">
+                            <span class="about-feature-icon">🏠</span>
+                            <div>
+                                <strong>Tableau de bord</strong>
+                                <p>Vue d'ensemble des finances de chaque membre</p>
+                            </div>
+                        </div>
+                        <div class="about-feature-item">
+                            <span class="about-feature-icon">⚖️</span>
+                            <div>
+                                <strong>Balance automatique</strong>
+                                <p>Calcul "Qui doit quoi à qui" avec minimisation des transactions</p>
+                            </div>
+                        </div>
+                        <div class="about-feature-item">
+                            <span class="about-feature-icon">💳</span>
+                            <div>
+                                <strong>Dépenses communes</strong>
+                                <p>Système "Payé par" avec sélection des participants</p>
+                            </div>
+                        </div>
+                        <div class="about-feature-item">
+                            <span class="about-feature-icon">📊</span>
+                            <div>
+                                <strong>Statistiques</strong>
+                                <p>Graphique camembert, filtres par période et par personne</p>
+                            </div>
+                        </div>
+                        <div class="about-feature-item">
+                            <span class="about-feature-icon">🔗</span>
+                            <div>
+                                <strong>Partage facile</strong>
+                                <p>Lien court généré automatiquement pour partager le groupe</p>
+                            </div>
+                        </div>
+                        <div class="about-feature-item">
+                            <span class="about-feature-icon">🔒</span>
+                            <div>
+                                <strong>Sécurité</strong>
+                                <p>Code PIN optionnel, données stockées localement</p>
+                            </div>
+                        </div>
+                        <div class="about-feature-item">
+                            <span class="about-feature-icon">📴</span>
+                            <div>
+                                <strong>Mode hors ligne</strong>
+                                <p>Fonctionne sans connexion internet</p>
+                            </div>
+                        </div>
+                        <div class="about-feature-item">
+                            <span class="about-feature-icon">🎨</span>
+                            <div>
+                                <strong>Thèmes</strong>
+                                <p>Mode sombre et mode clair</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Autres fonctionnalités -->
+                <div class="about-section">
+                    <h3 class="about-title">🛠️ Autres fonctionnalités</h3>
+                    <ul style="color: var(--text-secondary); line-height: 1.8; padding-left: 1.5rem;">
+                        <li>💸 Gestion des virements entre personnes</li>
+                        <li>🧮 Calculatrice intégrée</li>
+                        <li>📄 Export PDF des données</li>
+                        <li>💾 Sauvegarde/restauration JSON</li>
+                        <li>📱 Installation sur l'écran d'accueil</li>
+                        <li>✏️ Modification des dépenses</li>
+                        <li>🏷️ 36 icônes pour catégoriser les dépenses</li>
+                    </ul>
+                </div>
+                
+                <!-- Confidentialité -->
+                <div class="about-section">
+                    <h3 class="about-title">🔐 Confidentialité</h3>
+                    <p>Vos données restent sur votre appareil. Aucune information n'est envoyée à un serveur externe. L'application fonctionne entièrement en local.</p>
+                </div>
+                
+                <!-- Contact -->
+                <div class="about-section">
+                    <h3 class="about-title">📧 Contact</h3>
+                    <p>Une question, une suggestion ou un bug à signaler ?</p>
+                    <a href="mailto:contact@actuetmedia.fr" class="about-contact-btn">
+                        <span class="material-icons">email</span>
+                        contact@actuetmedia.fr
+                    </a>
+                </div>
+                
+                <!-- Crédits -->
+                <div class="about-section" style="text-align: center; border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Développé avec ❤️ par <strong>ActuetMedia</strong>
+                    </p>
+                    <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem;">
+                        © 2025 - Tous droits réservés
+                    </p>
+                    <button class="btn btn-small" onclick="showDonationPopup(); closeModal('aboutModal');" style="margin-top: 1rem; background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);">
+                        <span class="material-icons" style="font-size: 1rem;">favorite</span>
+                        Soutenir ce projet gratuit
+                    </button>
+                </div>
+                
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('aboutModal')" style="flex: 1;">Fermer</button>
+            </div>
+        </div>
+    </div>
+	
 <!-- Scripts iOS -->
 <script src="js/ios-fixes.js"></script>
 <script src="js/ios-install.js"></script>
