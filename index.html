@@ -812,9 +812,16 @@
     function renderUserCard(userId, container) {
         const user = appData.users[userId];
         const totalIncome = user.incomes.reduce((sum, item) => sum + item.amount, 0);
-        const totalExpense = user.expenses.reduce((sum, item) => sum + item.amount, 0);
+        let totalExpense = user.expenses.reduce((sum, item) => sum + item.amount, 0);
         
-        // Calculer la part des dépenses communes
+        // Pour la carte "Commun", ajouter le total des dépenses communes
+        if (userId === 'commun') {
+            appData.commonExpenses.forEach(expense => {
+                totalExpense += expense.amount;
+            });
+        }
+        
+        // Calculer la part des dépenses communes pour les utilisateurs
         let commonShare = 0;
         if (userId !== 'commun') {
             appData.commonExpenses.forEach(expense => {
