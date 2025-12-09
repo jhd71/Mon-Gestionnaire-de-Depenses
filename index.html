@@ -946,7 +946,7 @@
         // Activer le bon onglet
         const activeTab = Array.from(document.querySelectorAll('.tab')).find(tab => 
             tab.textContent === (tabId === 'dashboard' ? 'Tableau de bord' : 
-                               tabId === 'commun' ? 'Commun' : 
+                               tabId === 'commun' ? 'Balance' : 
                                appData.users[tabId]?.name)
         );
         if (activeTab) activeTab.classList.add('active');
