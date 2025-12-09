@@ -2237,8 +2237,14 @@ function syncTheme() {
     // Paramètres
 	// Afficher la page À propos
     function showAbout() {
-        closeModal('settingsModal');
-        openModal('aboutModal');
+        // Fermer le modal paramètres sans utiliser history.back()
+        document.getElementById('settingsModal').classList.remove('active');
+        document.body.style.overflow = '';
+        
+        // Ouvrir le modal À propos après un court délai
+        setTimeout(() => {
+            openModal('aboutModal');
+        }, 100);
     }
 	
     function openSettings() {
