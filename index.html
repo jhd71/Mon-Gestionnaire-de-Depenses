@@ -1617,7 +1617,8 @@
                     n: exp.name,
                     a: exp.amount,
                     p: exp.paidBy ? exp.paidBy.replace('user_', 'u') : '',
-                    ps: exp.participants.map(p => p.replace('user_', 'u'))
+                    ps: exp.participants.map(p => p.replace('user_', 'u')),
+                    ic: exp.icon || '🛒'
                 });
             });
             
@@ -1854,6 +1855,7 @@
                     amount: exp.a,
                     paidBy: exp.p ? exp.p.replace('u', 'user_') : null,
                     participants: exp.ps.map(p => p === 'c' ? 'commun' : p.replace('u', 'user_')),
+                    icon: exp.ic || '🛒',
                     date: new Date().toISOString()
                 }));
                 
