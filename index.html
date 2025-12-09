@@ -1471,65 +1471,85 @@
     }
     
     // Copier le lien de partage
-    function copyShareLink() {
-        // Créer une version minimale des données (sans les dates inutiles)
-        const minimalData = {
-            g: getGroupId(), // groupId raccourci
-            u: {}, // users
-            c: [], // commonExpenses
-            t: []  // transfers
-        };
-        
-        // Compresser les utilisateurs
-        for (const userId in appData.users) {
-            const user = appData.users[userId];
-            const shortId = userId === 'commun' ? 'c' : userId.replace('user_', 'u');
-            minimalData.u[shortId] = {
-                n: user.name,
-                i: user.incomes.map(i => ({ n: i.name, a: i.amount })),
-                e: user.expenses.map(e => ({ n: e.name, a: e.amount }))
+    async function copyShareLink() {
+        try {
+            // Créer une structure de données minimale
+            const minimalData = {
+                g: appData.groupId,
+                u: {},
+                c: [],
+                t: []
             };
+            
+            // Utilisateurs (avec clés courtes)
+            for (const userId in appData.users) {
+                const user = appData.users[userId];
+                const shortId = userId === 'commun' ? 'c' : userId.replace('user_', 'u');
+                minimalData.u[shortId] = {
+                    n: user.name,
+                    i: user.incomes || [],
+                    e: user.expenses || []
+                };
+            }
+            
+            // Dépenses communes (avec clés courtes)
+            appData.commonExpenses.forEach(exp => {
+                minimalData.c.push({
+                    n: exp.name,
+                    a: exp.amount,
+                    p: exp.paidBy ? exp.paidBy.replace('user_', 'u') : '',
+                    ps: exp.participants.map(p => p.replace('user_', 'u'))
+                });
+            });
+            
+            // Transferts (avec clés courtes)
+            appData.transfers.forEach(t => {
+                minimalData.t.push({
+                    d: t.description,
+                    a: t.amount,
+                    f: t.from.replace('user_', 'u'),
+                    o: t.to.replace('user_', 'u')
+                });
+            });
+            
+            // Compresser en base64
+            const jsonStr = JSON.stringify(minimalData);
+            const compressed = btoa(unescape(encodeURIComponent(jsonStr)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+            
+            const longUrl = `${window.location.origin}${window.location.pathname}?i=${compressed}`;
+            
+            // Essayer de raccourcir avec is.gd
+            showNotification('⏳ Création du lien court...', 'info');
+            
+            try {
+                const response = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`);
+                const data = await response.json();
+                
+                if (data.shorturl) {
+                    await navigator.clipboard.writeText(data.shorturl);
+                    showNotification('✅ Lien court copié ! ' + data.shorturl, 'success');
+                    return;
+                }
+            } catch (e) {
+                console.log('Raccourcissement échoué, utilisation du lien long');
+            }
+            
+            // Si le raccourcissement échoue, utiliser le lien long
+            if (longUrl.length > 2000) {
+                showNotification('⚠️ Lien trop long. Essayez de réduire les données.', 'error');
+                return;
+            }
+            
+            await navigator.clipboard.writeText(longUrl);
+            showNotification(`✅ Lien copié (${longUrl.length} car.)`, 'success');
+            
+        } catch (error) {
+            console.error('Erreur partage:', error);
+            showNotification('❌ Erreur lors de la création du lien', 'error');
         }
-        
-        // Compresser les dépenses communes
-        minimalData.c = appData.commonExpenses.map(exp => ({
-            n: exp.name,
-            a: exp.amount,
-            p: exp.paidBy ? exp.paidBy.replace('user_', 'u') : null,
-            ps: exp.participants.map(p => p.replace('user_', 'u'))
-        }));
-        
-        // Compresser les virements
-        if (appData.transfers) {
-            minimalData.t = appData.transfers.map(t => ({
-                d: t.description,
-                a: t.amount,
-                f: t.from.replace('user_', 'u'),
-                o: t.to.replace('user_', 'u')
-            }));
-        }
-        
-        const compressed = compressData(minimalData);
-        if (!compressed) {
-            alert('❌ Erreur lors de la création du lien.');
-            return;
-        }
-        
-        const shareUrl = `${window.location.origin}${window.location.pathname}?i=${compressed}`;
-        
-        // Vérifier la longueur
-        if (shareUrl.length > 2000) {
-            alert(
-                '⚠️ Trop de données pour un lien court.\n\n' +
-                `Longueur actuelle : ${shareUrl.length} caractères\n\n` +
-                'Options :\n' +
-                '• Utilisez "Télécharger" pour créer un fichier\n' +
-                '• Ou partagez le code du groupe et synchronisez manuellement'
-            );
-            return;
-        }
-        
-        copyToClipboard(shareUrl, `Lien copié ! (${shareUrl.length} car.) 🔗`);
     }
     
     // Fonction utilitaire pour copier dans le presse-papier
