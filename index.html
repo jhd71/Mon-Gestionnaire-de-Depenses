@@ -232,6 +232,55 @@
         </div>
     </div>
 
+<!-- Modal pour modifier une dépense commune -->
+    <div class="modal" id="editCommonExpenseModal">
+        <div class="modal-content">
+            <div class="modal-header">✏️ Modifier la dépense</div>
+            <div class="modal-body">
+                <input type="hidden" id="editExpenseIndex">
+                
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Description</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button type="button" class="icon-selector-btn" id="editSelectedIconBtn" onclick="toggleEditIconPicker()">
+                            <span id="editSelectedIconDisplay">🛒</span>
+                        </button>
+                        <input type="text" class="input" id="editCommonExpenseName" placeholder="Ex: Courses Leclerc" style="flex: 1;">
+                    </div>
+                    <input type="hidden" id="editCommonExpenseIcon" value="🛒">
+                </div>
+                
+                <!-- Sélecteur d'icônes pour modification -->
+                <div id="editIconPickerContainer" class="icon-picker-container" style="display: none;">
+                    <div class="icon-picker-grid" id="editIconPickerGrid">
+                        <!-- Généré dynamiquement -->
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Montant (€)</label>
+                    <input type="number" class="input" id="editCommonExpenseAmount" placeholder="0.00" step="0.01">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">💳 Payé par</label>
+                    <select class="input" id="editCommonExpensePaidBy">
+                        <!-- Rempli dynamiquement -->
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">👥 Participants</label>
+                    <div id="editParticipantsList" class="participants">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('editCommonExpenseModal')">Annuler</button>
+                <button class="btn" onclick="confirmEditCommonExpense()">💾 Enregistrer</button>
+            </div>
+        </div>
+    </div>
+	
 <!-- Modal de partage -->
     <div class="modal" id="shareModal">
         <div class="modal-content" style="max-width: 420px;">
@@ -898,7 +947,7 @@
                     : expense.amount.toFixed(2);
                 
                 return `
-                    <div class="item expense-item">
+                    <div class="item expense-item" onclick="editCommonExpense(${index})" style="cursor: pointer;">
                         <div class="item-icon expense">${expense.icon || '🛒'}</div>
                         <div class="item-info">
                             <div class="item-name">${expense.name}</div>
@@ -911,7 +960,8 @@
                         </div>
                         <div class="item-actions">
                             <span class="item-amount expense">${expense.amount.toFixed(2)}€</span>
-                            <button class="btn-delete" onclick="deleteCommonExpense(${index})">×</button>
+                            <button class="btn-edit" onclick="event.stopPropagation(); editCommonExpense(${index})" title="Modifier">✏️</button>
+                            <button class="btn-delete" onclick="event.stopPropagation(); deleteCommonExpense(${index})" title="Supprimer">×</button>
                         </div>
                     </div>
                 `;
@@ -1841,6 +1891,151 @@
                 console.error('Erreur import URL:', error);
             }
         }
+    }
+	
+	// ========== MODIFICATION DES DÉPENSES ==========
+    
+    let editIconPickerVisible = false;
+    
+    // Ouvrir le modal de modification d'une dépense commune
+    function editCommonExpense(index) {
+        const expense = appData.commonExpenses[index];
+        if (!expense) return;
+        
+        // Stocker l'index
+        document.getElementById('editExpenseIndex').value = index;
+        
+        // Remplir les champs
+        document.getElementById('editCommonExpenseName').value = expense.name;
+        document.getElementById('editCommonExpenseAmount').value = expense.amount;
+        document.getElementById('editCommonExpenseIcon').value = expense.icon || '🛒';
+        document.getElementById('editSelectedIconDisplay').textContent = expense.icon || '🛒';
+        
+        // Masquer le sélecteur d'icônes
+        document.getElementById('editIconPickerContainer').style.display = 'none';
+        editIconPickerVisible = false;
+        
+        // Générer la liste "Payé par"
+        const paidBySelect = document.getElementById('editCommonExpensePaidBy');
+        paidBySelect.innerHTML = '';
+        
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                const option = document.createElement('option');
+                option.value = userId;
+                option.textContent = appData.users[userId].name;
+                if (userId === expense.paidBy) {
+                    option.selected = true;
+                }
+                paidBySelect.appendChild(option);
+            }
+        }
+        
+        // Générer la liste des participants
+        const participantsList = document.getElementById('editParticipantsList');
+        participantsList.innerHTML = '';
+        
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                const userName = appData.users[userId].name;
+                const isParticipant = expense.participants.includes(userId);
+                
+                const checkbox = document.createElement('div');
+                checkbox.className = 'participant-checkbox';
+                checkbox.innerHTML = `
+                    <input type="checkbox" id="edit_participant_${userId}" value="${userId}" ${isParticipant ? 'checked' : ''}>
+                    <label for="edit_participant_${userId}">${userName}</label>
+                `;
+                participantsList.appendChild(checkbox);
+            }
+        }
+        
+        openModal('editCommonExpenseModal');
+    }
+    
+    // Toggle du sélecteur d'icônes pour modification
+    function toggleEditIconPicker() {
+        const container = document.getElementById('editIconPickerContainer');
+        editIconPickerVisible = !editIconPickerVisible;
+        
+        if (editIconPickerVisible) {
+            const grid = document.getElementById('editIconPickerGrid');
+            const currentIcon = document.getElementById('editCommonExpenseIcon').value;
+            
+            grid.innerHTML = availableIcons.map(item => `
+                <button type="button" 
+                        class="icon-picker-item ${item.icon === currentIcon ? 'selected' : ''}" 
+                        onclick="selectEditIcon('${item.icon}')"
+                        title="${item.label}">
+                    ${item.icon}
+                </button>
+            `).join('');
+            
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+    
+    // Sélectionner une icône pour modification
+    function selectEditIcon(icon) {
+        document.getElementById('editCommonExpenseIcon').value = icon;
+        document.getElementById('editSelectedIconDisplay').textContent = icon;
+        
+        document.querySelectorAll('#editIconPickerGrid .icon-picker-item').forEach(item => {
+            item.classList.remove('selected');
+            if (item.textContent.trim() === icon) {
+                item.classList.add('selected');
+            }
+        });
+        
+        toggleEditIconPicker();
+    }
+    
+    // Confirmer la modification d'une dépense commune
+    function confirmEditCommonExpense() {
+        const index = parseInt(document.getElementById('editExpenseIndex').value);
+        const name = document.getElementById('editCommonExpenseName').value.trim();
+        const amount = parseFloat(document.getElementById('editCommonExpenseAmount').value);
+        const paidBy = document.getElementById('editCommonExpensePaidBy').value;
+        const icon = document.getElementById('editCommonExpenseIcon').value || '🛒';
+        
+        if (!name || isNaN(amount) || amount <= 0) {
+            alert('Veuillez remplir tous les champs correctement');
+            return;
+        }
+        
+        if (!paidBy) {
+            alert('Veuillez sélectionner qui a payé');
+            return;
+        }
+        
+        // Récupérer les participants sélectionnés
+        const participants = [];
+        document.querySelectorAll('#editParticipantsList input[type="checkbox"]:checked').forEach(checkbox => {
+            participants.push(checkbox.value);
+        });
+        
+        if (participants.length === 0) {
+            alert('Veuillez sélectionner au moins un participant');
+            return;
+        }
+        
+        // Mettre à jour la dépense
+        appData.commonExpenses[index] = {
+            ...appData.commonExpenses[index],
+            name: name,
+            amount: amount,
+            paidBy: paidBy,
+            participants: participants,
+            icon: icon,
+            modifiedDate: new Date().toISOString()
+        };
+        
+        saveData();
+        renderApp();
+        closeModal('editCommonExpenseModal');
+        showNotification('✅ Dépense modifiée !', 'success');
     }
 	
     function deleteCommonExpense(index) {
