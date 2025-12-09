@@ -193,7 +193,20 @@
             <div class="modal-body">
                 <div style="margin-bottom: 1rem;">
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Description</label>
-                    <input type="text" class="input" id="commonExpenseName" placeholder="Ex: Courses Leclerc">
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button type="button" class="icon-selector-btn" id="selectedIconBtn" onclick="toggleIconPicker()">
+                            <span id="selectedIconDisplay">🛒</span>
+                        </button>
+                        <input type="text" class="input" id="commonExpenseName" placeholder="Ex: Courses Leclerc" style="flex: 1;">
+                    </div>
+                    <input type="hidden" id="commonExpenseIcon" value="🛒">
+                </div>
+                
+                <!-- Sélecteur d'icônes -->
+                <div id="iconPickerContainer" class="icon-picker-container" style="display: none;">
+                    <div class="icon-picker-grid" id="iconPickerGrid">
+                        <!-- Généré dynamiquement -->
+                    </div>
                 </div>
                 <div style="margin-bottom: 1rem;">
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Montant (€)</label>
@@ -886,7 +899,7 @@
                 
                 return `
                     <div class="item expense-item">
-                        <div class="item-icon expense">🛒</div>
+                        <div class="item-icon expense">${expense.icon || '🛒'}</div>
                         <div class="item-info">
                             <div class="item-name">${expense.name}</div>
                             <div class="item-meta">
@@ -1041,6 +1054,12 @@
         document.getElementById('commonExpenseName').value = '';
         document.getElementById('commonExpenseAmount').value = '';
         
+        // Réinitialiser l'icône par défaut
+        document.getElementById('commonExpenseIcon').value = '🛒';
+        document.getElementById('selectedIconDisplay').textContent = '🛒';
+        document.getElementById('iconPickerContainer').style.display = 'none';
+        iconPickerVisible = false;
+        
         // Générer la liste "Payé par"
         const paidBySelect = document.getElementById('commonExpensePaidBy');
         paidBySelect.innerHTML = '';
@@ -1099,11 +1118,14 @@
             return;
         }
         
+        const icon = document.getElementById('commonExpenseIcon').value || '🛒';
+        
         appData.commonExpenses.push({
             name: name,
             amount: amount,
             paidBy: paidBy,
             participants: participants,
+            icon: icon,
             date: new Date().toISOString()
         });
         
@@ -2233,6 +2255,90 @@ function syncTheme() {
         '#a855f7', // Purple
     ];
     
+	// Liste des icônes disponibles pour le sélecteur
+    const availableIcons = [
+        { icon: '🛒', label: 'Courses' },
+        { icon: '🏠', label: 'Logement' },
+        { icon: '💧', label: 'Eau' },
+        { icon: '⚡', label: 'Électricité' },
+        { icon: '🔥', label: 'Gaz' },
+        { icon: '📶', label: 'Internet' },
+        { icon: '📱', label: 'Téléphone' },
+        { icon: '🛡️', label: 'Assurance' },
+        { icon: '🏥', label: 'Santé' },
+        { icon: '💊', label: 'Pharmacie' },
+        { icon: '👨‍⚕️', label: 'Médecin' },
+        { icon: '🚗', label: 'Voiture' },
+        { icon: '⛽', label: 'Essence' },
+        { icon: '🅿️', label: 'Parking' },
+        { icon: '🚌', label: 'Transport' },
+        { icon: '🚆', label: 'Train' },
+        { icon: '✈️', label: 'Voyage' },
+        { icon: '🏨', label: 'Hôtel' },
+        { icon: '🍽️', label: 'Restaurant' },
+        { icon: '🍕', label: 'Pizza' },
+        { icon: '🍔', label: 'Fast-food' },
+        { icon: '☕', label: 'Café' },
+        { icon: '🎬', label: 'Cinéma' },
+        { icon: '🎵', label: 'Musique' },
+        { icon: '🎮', label: 'Jeux' },
+        { icon: '📺', label: 'TV' },
+        { icon: '💳', label: 'Crédit' },
+        { icon: '🏦', label: 'Banque' },
+        { icon: '📋', label: 'Impôts' },
+        { icon: '👕', label: 'Vêtements' },
+        { icon: '🛍️', label: 'Shopping' },
+        { icon: '🎁', label: 'Cadeau' },
+        { icon: '📦', label: 'Colis' },
+        { icon: '🐕', label: 'Animaux' },
+        { icon: '🐙', label: 'Octopus' },
+        { icon: '💰', label: 'Autre' }
+    ];
+    
+    let iconPickerVisible = false;
+    
+    // Afficher/masquer le sélecteur d'icônes
+    function toggleIconPicker() {
+        const container = document.getElementById('iconPickerContainer');
+        iconPickerVisible = !iconPickerVisible;
+        
+        if (iconPickerVisible) {
+            // Générer la grille d'icônes
+            const grid = document.getElementById('iconPickerGrid');
+            const currentIcon = document.getElementById('commonExpenseIcon').value;
+            
+            grid.innerHTML = availableIcons.map(item => `
+                <button type="button" 
+                        class="icon-picker-item ${item.icon === currentIcon ? 'selected' : ''}" 
+                        onclick="selectIcon('${item.icon}')"
+                        title="${item.label}">
+                    ${item.icon}
+                </button>
+            `).join('');
+            
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+    
+    // Sélectionner une icône
+    function selectIcon(icon) {
+        document.getElementById('commonExpenseIcon').value = icon;
+        document.getElementById('selectedIconDisplay').textContent = icon;
+        
+        // Mettre à jour la sélection visuelle
+        document.querySelectorAll('.icon-picker-item').forEach(item => {
+            item.classList.remove('selected');
+            if (item.textContent.trim() === icon) {
+                item.classList.add('selected');
+            }
+        });
+        
+        // Fermer le sélecteur
+        toggleIconPicker();
+    }
+	
     // Icônes par mot-clé dans le nom de la dépense
     const categoryIcons = {
         'loyer': '🏠',
@@ -2379,7 +2485,7 @@ function syncTheme() {
                 categories[name] = {
                     name: name,
                     amount: 0,
-                    icon: getIconForExpense(name)
+                    icon: exp.icon || getIconForExpense(name)
                 };
             }
             categories[name].amount += exp.amount;
@@ -2426,7 +2532,8 @@ function syncTheme() {
             expenses.push({
                 name: exp.name,
                 amount: amount,
-                date: exp.date
+                date: exp.date,
+                icon: exp.icon
             });
         });
         
