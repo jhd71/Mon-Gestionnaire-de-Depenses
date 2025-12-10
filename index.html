@@ -934,9 +934,6 @@
 
     // Fonctions de rendu
     function renderApp() {
-        // Sauvegarder l'onglet actif avant le rendu
-        const savedTab = currentTab || appData.currentTab || 'dashboard';
-        
         renderTabs();
         renderDashboard();
         renderUserTabs();
@@ -945,30 +942,60 @@
         renderTransfers();
         updatePinButtonText();
         
-        // Restaurer l'onglet actif après le rendu
-        currentTab = savedTab;
-        appData.currentTab = savedTab;
+        // Toujours restaurer l'onglet actif après le rendu
+        restoreActiveTab();
+    }
+    
+    // Fonction pour restaurer visuellement l'onglet actif
+    function restoreActiveTab() {
+        const activeTabId = currentTab || appData.currentTab || 'dashboard';
         
-        // S'assurer que le bon contenu est affiché
+        // Mettre à jour les boutons d'onglets
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Trouver et activer le bon bouton d'onglet
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach(tab => {
+            const tabName = tab.textContent;
+            let isActive = false;
+            
+            if (activeTabId === 'dashboard' && tabName === 'Tableau de bord') {
+                isActive = true;
+            } else if (activeTabId === 'commun' && tabName === 'Balance') {
+                isActive = true;
+            } else if (appData.users[activeTabId] && tabName === appData.users[activeTabId].name) {
+                isActive = true;
+            }
+            
+            if (isActive) {
+                tab.classList.add('active');
+            }
+        });
+        
+        // Mettre à jour les contenus d'onglets
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.remove('active');
         });
-        const activeContent = document.getElementById(savedTab);
+        
+        const activeContent = document.getElementById(activeTabId);
         if (activeContent) {
             activeContent.classList.add('active');
         }
+        
+        // Synchroniser les variables
+        currentTab = activeTabId;
+        appData.currentTab = activeTabId;
     }
 
     function renderTabs() {
         const container = document.getElementById('tabs');
         container.innerHTML = '';
         
-        // S'assurer que currentTab est synchronisé avec appData
-        const activeTab = currentTab || appData.currentTab || 'dashboard';
-        
         // Onglet Tableau de bord (toujours en premier)
         const dashboardTab = document.createElement('button');
-        dashboardTab.className = 'tab' + (activeTab === 'dashboard' ? ' active' : '');
+        dashboardTab.className = 'tab';
         dashboardTab.textContent = 'Tableau de bord';
         dashboardTab.onclick = () => switchTab('dashboard');
         container.appendChild(dashboardTab);
@@ -977,7 +1004,7 @@
         Object.keys(appData.users).forEach(userId => {
             if (userId === 'commun') return;
             const tab = document.createElement('button');
-            tab.className = 'tab' + (activeTab === userId ? ' active' : '');
+            tab.className = 'tab';
             tab.textContent = appData.users[userId].name;
             tab.onclick = () => switchTab(userId);
             container.appendChild(tab);
@@ -985,7 +1012,7 @@
         
         // Onglet Balance (anciennement Commun)
         const communTab = document.createElement('button');
-        communTab.className = 'tab' + (activeTab === 'commun' ? ' active' : '');
+        communTab.className = 'tab';
         communTab.textContent = 'Balance';
         communTab.onclick = () => switchTab('commun');
         container.appendChild(communTab);
@@ -996,10 +1023,6 @@
         addBtn.textContent = '+';
         addBtn.onclick = () => openModal('addTabModal');
         container.appendChild(addBtn);
-        
-        // Synchroniser les variables
-        currentTab = activeTab;
-        appData.currentTab = activeTab;
     }
 
     function renderDashboard() {
@@ -1105,7 +1128,7 @@
             if (userId !== 'commun') {
                 const tabContent = document.createElement('div');
                 tabContent.id = userId;
-                tabContent.className = `tab-content user-tab-content ${appData.currentTab === userId ? 'active' : ''}`;
+                tabContent.className = 'tab-content user-tab-content';
                 
                 tabContent.innerHTML = `
                     <div class="section">
