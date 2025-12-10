@@ -934,6 +934,9 @@
 
     // Fonctions de rendu
     function renderApp() {
+        // Sauvegarder l'onglet actif avant le rendu
+        const savedTab = currentTab || appData.currentTab || 'dashboard';
+        
         renderTabs();
         renderDashboard();
         renderUserTabs();
@@ -941,15 +944,31 @@
         renderBalance();
         renderTransfers();
         updatePinButtonText();
+        
+        // Restaurer l'onglet actif après le rendu
+        currentTab = savedTab;
+        appData.currentTab = savedTab;
+        
+        // S'assurer que le bon contenu est affiché
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        const activeContent = document.getElementById(savedTab);
+        if (activeContent) {
+            activeContent.classList.add('active');
+        }
     }
 
     function renderTabs() {
         const container = document.getElementById('tabs');
         container.innerHTML = '';
         
+        // S'assurer que currentTab est synchronisé avec appData
+        const activeTab = currentTab || appData.currentTab || 'dashboard';
+        
         // Onglet Tableau de bord (toujours en premier)
         const dashboardTab = document.createElement('button');
-        dashboardTab.className = 'tab' + (currentTab === 'dashboard' ? ' active' : '');
+        dashboardTab.className = 'tab' + (activeTab === 'dashboard' ? ' active' : '');
         dashboardTab.textContent = 'Tableau de bord';
         dashboardTab.onclick = () => switchTab('dashboard');
         container.appendChild(dashboardTab);
@@ -958,7 +977,7 @@
         Object.keys(appData.users).forEach(userId => {
             if (userId === 'commun') return;
             const tab = document.createElement('button');
-            tab.className = 'tab' + (currentTab === userId ? ' active' : '');
+            tab.className = 'tab' + (activeTab === userId ? ' active' : '');
             tab.textContent = appData.users[userId].name;
             tab.onclick = () => switchTab(userId);
             container.appendChild(tab);
@@ -966,7 +985,7 @@
         
         // Onglet Balance (anciennement Commun)
         const communTab = document.createElement('button');
-        communTab.className = 'tab' + (currentTab === 'commun' ? ' active' : '');
+        communTab.className = 'tab' + (activeTab === 'commun' ? ' active' : '');
         communTab.textContent = 'Balance';
         communTab.onclick = () => switchTab('commun');
         container.appendChild(communTab);
@@ -977,6 +996,10 @@
         addBtn.textContent = '+';
         addBtn.onclick = () => openModal('addTabModal');
         container.appendChild(addBtn);
+        
+        // Synchroniser les variables
+        currentTab = activeTab;
+        appData.currentTab = activeTab;
     }
 
     function renderDashboard() {
@@ -1679,14 +1702,6 @@
         
         saveData();
         renderApp();
-        
-        // Réactiver visuellement l'onglet Balance
-        setTimeout(() => {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            const balanceTab = Array.from(document.querySelectorAll('.tab')).find(tab => tab.textContent === 'Balance');
-            if (balanceTab) balanceTab.classList.add('active');
-        }, 50);
-        
         showNotification(`✅ ${fromName} a remboursé ${amount.toFixed(2)}€ à ${toName}`, 'success');
     }
     
@@ -1706,14 +1721,6 @@
         appData.transfers.splice(index, 1);
         saveData();
         renderApp();
-        
-        // Réactiver visuellement l'onglet Balance
-        setTimeout(() => {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            const balanceTab = Array.from(document.querySelectorAll('.tab')).find(tab => tab.textContent === 'Balance');
-            if (balanceTab) balanceTab.classList.add('active');
-        }, 50);
-        
         showNotification('🔄 Remboursement annulé, dette réactivée', 'info');
     }
 	
