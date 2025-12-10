@@ -652,6 +652,116 @@
         setInterval(saveData, 5000); // Sauvegarde automatique toutes les 5 secondes
     });
 
+// ========== NAVIGATION PAR SWIPE ==========
+    
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 80;
+    const maxVerticalDistance = 100;
+    
+    // Obtenir la liste ordonnée des onglets
+    function getTabsOrder() {
+        const tabs = ['dashboard'];
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                tabs.push(userId);
+            }
+        }
+        tabs.push('commun');
+        return tabs;
+    }
+    
+    // Naviguer vers l'onglet précédent
+    function goToPreviousTab() {
+        const tabs = getTabsOrder();
+        const currentIndex = tabs.indexOf(currentTab);
+        if (currentIndex > 0) {
+            switchTab(tabs[currentIndex - 1]);
+            showSwipeIndicator('◀', 'left');
+        }
+    }
+    
+    // Naviguer vers l'onglet suivant
+    function goToNextTab() {
+        const tabs = getTabsOrder();
+        const currentIndex = tabs.indexOf(currentTab);
+        if (currentIndex < tabs.length - 1) {
+            switchTab(tabs[currentIndex + 1]);
+            showSwipeIndicator('▶', 'right');
+        }
+    }
+    
+    // Afficher un indicateur de swipe
+    function showSwipeIndicator(symbol, direction) {
+        const existing = document.querySelector('.swipe-indicator');
+        if (existing) existing.remove();
+        
+        const indicator = document.createElement('div');
+        indicator.className = 'swipe-indicator';
+        indicator.textContent = symbol;
+        indicator.style.cssText = `
+            position: fixed;
+            top: 50%;
+            ${direction === 'left' ? 'left: 20px' : 'right: 20px'};
+            transform: translateY(-50%);
+            font-size: 2rem;
+            color: var(--primary);
+            background: var(--bg-secondary);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            animation: swipeFade 0.4s ease-out forwards;
+            pointer-events: none;
+        `;
+        document.body.appendChild(indicator);
+        setTimeout(() => indicator.remove(), 400);
+    }
+    
+    // Gestionnaires tactiles
+    function handleTouchStart(e) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }
+    
+    function handleTouchEnd(e) {
+        touchEndX = e.changedTouches[0].clientX;
+        touchEndY = e.changedTouches[0].clientY;
+        
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        
+        if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaY) < maxVerticalDistance) {
+            if (deltaX > 0) {
+                goToPreviousTab();
+            } else {
+                goToNextTab();
+            }
+        }
+    }
+    
+    // Initialiser le swipe après le chargement du DOM
+    function initSwipe() {
+        const contentArea = document.querySelector('.content');
+        if (contentArea) {
+            contentArea.addEventListener('touchstart', handleTouchStart, { passive: true });
+            contentArea.addEventListener('touchend', handleTouchEnd, { passive: true });
+        }
+    }
+    
+    // Appeler l'initialisation quand le DOM est prêt
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSwipe);
+    } else {
+        initSwipe();
+    }
+	
     // Fonctions de gestion des données
     function loadData() {
     try {
@@ -746,182 +856,6 @@
         setTimeout(() => {
             checkAndFixEmptyDisplay();
         }, 200);
-    });
-	
-	// ========== NAVIGATION PAR SWIPE ==========
-    
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchEndX = 0;
-    let touchEndY = 0;
-    const minSwipeDistance = 80; // Distance minimum pour déclencher un swipe
-    const maxVerticalDistance = 100; // Distance verticale max pour considérer comme swipe horizontal
-    
-    // Obtenir la liste ordonnée des onglets
-    function getTabsOrder() {
-        const tabs = ['dashboard'];
-        
-        // Ajouter les utilisateurs dans l'ordre
-        for (const userId in appData.users) {
-            if (userId !== 'commun') {
-                tabs.push(userId);
-            }
-        }
-        
-        // Ajouter Balance (commun) à la fin
-        tabs.push('commun');
-        
-        return tabs;
-    }
-    
-    // Naviguer vers l'onglet précédent
-    function goToPreviousTab() {
-        const tabs = getTabsOrder();
-        const currentIndex = tabs.indexOf(currentTab);
-        
-        if (currentIndex > 0) {
-            const previousTab = tabs[currentIndex - 1];
-            switchTab(previousTab);
-            showSwipeIndicator('◀', 'left');
-        } else {
-            // Déjà au premier onglet - petit feedback visuel
-            showSwipeIndicator('⊘', 'left');
-        }
-    }
-    
-    // Naviguer vers l'onglet suivant
-    function goToNextTab() {
-        const tabs = getTabsOrder();
-        const currentIndex = tabs.indexOf(currentTab);
-        
-        if (currentIndex < tabs.length - 1) {
-            const nextTab = tabs[currentIndex + 1];
-            switchTab(nextTab);
-            showSwipeIndicator('▶', 'right');
-        } else {
-            // Déjà au dernier onglet - petit feedback visuel
-            showSwipeIndicator('⊘', 'right');
-        }
-    }
-    
-    // Afficher un indicateur de swipe
-    function showSwipeIndicator(symbol, direction) {
-        // Supprimer l'ancien indicateur s'il existe
-        const existing = document.querySelector('.swipe-indicator');
-        if (existing) existing.remove();
-        
-        const indicator = document.createElement('div');
-        indicator.className = 'swipe-indicator';
-        indicator.textContent = symbol;
-        indicator.style.cssText = `
-            position: fixed;
-            top: 50%;
-            ${direction === 'left' ? 'left: 20px' : 'right: 20px'};
-            transform: translateY(-50%);
-            font-size: 2rem;
-            color: var(--primary);
-            background: var(--bg-secondary);
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            z-index: 9999;
-            animation: swipeFade 0.4s ease-out forwards;
-            pointer-events: none;
-        `;
-        
-        document.body.appendChild(indicator);
-        
-        setTimeout(() => indicator.remove(), 400);
-    }
-    
-    // Gestionnaire tactile - début du toucher
-    function handleTouchStart(e) {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-    }
-    
-	// Gestionnaire tactile - pendant le mouvement (optionnel, pour feedback visuel)
-    function handleTouchMove(e) {
-        const currentX = e.touches[0].clientX;
-        const deltaX = currentX - touchStartX;
-        
-        // Afficher un indicateur sur le bord si on swipe assez
-        if (Math.abs(deltaX) > 30) {
-            showEdgeIndicator(deltaX > 0 ? 'left' : 'right');
-        } else {
-            hideEdgeIndicators();
-        }
-    }
-    
-    // Afficher l'indicateur de bord
-    function showEdgeIndicator(side) {
-        hideEdgeIndicators();
-        
-        let indicator = document.querySelector(`.swipe-edge-indicator.${side}`);
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.className = `swipe-edge-indicator ${side}`;
-            document.body.appendChild(indicator);
-        }
-        indicator.classList.add('active');
-    }
-    
-    // Masquer les indicateurs de bord
-    function hideEdgeIndicators() {
-        document.querySelectorAll('.swipe-edge-indicator').forEach(el => {
-            el.classList.remove('active');
-        });
-    }
-    
-    // Ajouter le gestionnaire de mouvement
-    if (contentArea) {
-        contentArea.addEventListener('touchmove', handleTouchMove, { passive: true });
-        contentArea.addEventListener('touchend', () => hideEdgeIndicators(), { passive: true });
-        contentArea.addEventListener('touchcancel', () => hideEdgeIndicators(), { passive: true });
-    }
-	
-    // Gestionnaire tactile - fin du toucher
-    function handleTouchEnd(e) {
-        touchEndX = e.changedTouches[0].clientX;
-        touchEndY = e.changedTouches[0].clientY;
-        handleSwipe();
-    }
-    
-    // Analyser et traiter le swipe
-    function handleSwipe() {
-        const deltaX = touchEndX - touchStartX;
-        const deltaY = touchEndY - touchStartY;
-        
-        // Vérifier que c'est un swipe horizontal (pas vertical)
-        if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaY) < maxVerticalDistance) {
-            if (deltaX > 0) {
-                // Swipe vers la droite → onglet précédent
-                goToPreviousTab();
-            } else {
-                // Swipe vers la gauche → onglet suivant
-                goToNextTab();
-            }
-        }
-    }
-    
-    // Activer le swipe sur la zone de contenu
-    const contentArea = document.querySelector('.content');
-    if (contentArea) {
-        contentArea.addEventListener('touchstart', handleTouchStart, { passive: true });
-        contentArea.addEventListener('touchend', handleTouchEnd, { passive: true });
-    }
-    
-    // Activer aussi sur le dashboard
-    document.addEventListener('DOMContentLoaded', () => {
-        const dashboard = document.getElementById('dashboard');
-        if (dashboard) {
-            dashboard.addEventListener('touchstart', handleTouchStart, { passive: true });
-            dashboard.addEventListener('touchend', handleTouchEnd, { passive: true });
-        }
     });
 	
     // Fonctions de donation
