@@ -932,8 +932,14 @@
     }
 }
 
+    // Variable pour stocker l'onglet à restaurer
+    let tabToRestoreAfterRender = null;
+    
     // Fonctions de rendu
-    function renderApp() {
+    function renderApp(forceTab = null) {
+        // Sauvegarder l'onglet actif AVANT le rendu
+        tabToRestoreAfterRender = forceTab || currentTab || appData.currentTab || 'dashboard';
+        
         renderTabs();
         renderDashboard();
         renderUserTabs();
@@ -942,51 +948,55 @@
         renderTransfers();
         updatePinButtonText();
         
-        // Toujours restaurer l'onglet actif après le rendu
-        restoreActiveTab();
+        // Restaurer l'onglet APRÈS le rendu
+        applyActiveTab(tabToRestoreAfterRender);
     }
     
-    // Fonction pour restaurer visuellement l'onglet actif
-    function restoreActiveTab() {
-        const activeTabId = currentTab || appData.currentTab || 'dashboard';
+    // Fonction pour appliquer visuellement l'onglet actif
+    function applyActiveTab(tabId) {
+        // S'assurer que tabId est valide
+        if (!tabId || (tabId !== 'dashboard' && tabId !== 'commun' && !appData.users[tabId])) {
+            tabId = 'dashboard';
+        }
         
-        // Mettre à jour les boutons d'onglets
+        // Mettre à jour les variables globales
+        currentTab = tabId;
+        appData.currentTab = tabId;
+        
+        // Désactiver tous les boutons d'onglets
         document.querySelectorAll('.tab').forEach(tab => {
             tab.classList.remove('active');
         });
         
-        // Trouver et activer le bon bouton d'onglet
-        const tabs = document.querySelectorAll('.tab');
-        tabs.forEach(tab => {
-            const tabName = tab.textContent;
-            let isActive = false;
-            
-            if (activeTabId === 'dashboard' && tabName === 'Tableau de bord') {
-                isActive = true;
-            } else if (activeTabId === 'commun' && tabName === 'Balance') {
-                isActive = true;
-            } else if (appData.users[activeTabId] && tabName === appData.users[activeTabId].name) {
-                isActive = true;
-            }
-            
-            if (isActive) {
+        // Activer le bon bouton d'onglet
+        const allTabs = document.querySelectorAll('.tab');
+        allTabs.forEach(tab => {
+            const tabText = tab.textContent;
+            if (tabId === 'dashboard' && tabText === 'Tableau de bord') {
+                tab.classList.add('active');
+            } else if (tabId === 'commun' && tabText === 'Balance') {
+                tab.classList.add('active');
+            } else if (appData.users[tabId] && tabText === appData.users[tabId].name) {
                 tab.classList.add('active');
             }
         });
         
-        // Mettre à jour les contenus d'onglets
+        // Désactiver tous les contenus
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.remove('active');
         });
         
-        const activeContent = document.getElementById(activeTabId);
+        // Activer le bon contenu
+        const activeContent = document.getElementById(tabId);
         if (activeContent) {
             activeContent.classList.add('active');
         }
         
-        // Synchroniser les variables
-        currentTab = activeTabId;
-        appData.currentTab = activeTabId;
+        // Gérer le FAB
+        const fabButton = document.getElementById('fabButton');
+        if (fabButton) {
+            fabButton.style.display = (tabId === 'dashboard') ? 'none' : 'flex';
+        }
     }
 
     function renderTabs() {
@@ -1235,31 +1245,7 @@
 
     // Gestion des onglets
     function switchTab(tabId) {
-        appData.currentTab = tabId;
-        
-        // Mettre à jour les onglets actifs
-        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        
-        // Activer le bon onglet
-        const activeTab = Array.from(document.querySelectorAll('.tab')).find(tab => 
-            tab.textContent === (tabId === 'dashboard' ? 'Tableau de bord' : 
-                               tabId === 'commun' ? 'Balance' : 
-                               appData.users[tabId]?.name)
-        );
-        if (activeTab) activeTab.classList.add('active');
-        
-        const activeContent = document.getElementById(tabId);
-        if (activeContent) activeContent.classList.add('active');
-        
-        // Masquer/afficher le FAB selon l'onglet
-        const fabButton = document.getElementById('fabButton');
-        if (tabId === 'dashboard') {
-            fabButton.style.display = 'none';
-        } else {
-            fabButton.style.display = 'flex';
-        }
-        
+        applyActiveTab(tabId);
         saveData();
     }
 
@@ -1278,9 +1264,8 @@
                 expenses: []
             };
             saveData();
-            renderApp();
-            switchTab(userId);
             closeModal('addTabModal');
+            renderApp(userId); // Aller directement sur le nouvel onglet
         }
     }
 
@@ -1297,14 +1282,15 @@
         const amount = parseFloat(document.getElementById('incomeAmount').value);
         
         if (name && amount > 0) {
+            const savedTab = currentTab; // Sauvegarder l'onglet actuel
             appData.users[currentUser].incomes.push({
                 name: name,
                 amount: amount,
                 date: new Date().toISOString()
             });
             saveData();
-            renderApp();
             closeModal('addIncomeModal');
+            renderApp(savedTab); // Passer l'onglet à restaurer
             trackUserAction();
         }
     }
@@ -1322,14 +1308,15 @@
         const amount = parseFloat(document.getElementById('expenseAmount').value);
         
         if (name && amount > 0) {
+            const savedTab = currentTab;
             appData.users[currentUser].expenses.push({
                 name: name,
                 amount: amount,
                 date: new Date().toISOString()
             });
             saveData();
-            renderApp();
             closeModal('addExpenseModal');
+            renderApp(savedTab);
             trackUserAction();
         }
     }
@@ -1392,7 +1379,6 @@
             return;
         }
         
-        // Récupérer les participants sélectionnés
         const participants = [];
         document.querySelectorAll('#participantsList input[type="checkbox"]:checked').forEach(checkbox => {
             participants.push(checkbox.value);
@@ -1403,6 +1389,7 @@
             return;
         }
         
+        const savedTab = currentTab;
         const icon = document.getElementById('commonExpenseIcon').value || '🛒';
         
         appData.commonExpenses.push({
@@ -1415,11 +1402,10 @@
         });
         
         saveData();
-        renderApp();
         closeModal('addCommonExpenseModal');
+        renderApp(savedTab);
         trackUserAction();
         
-        // Message de confirmation
         const paidByName = appData.users[paidBy]?.name || 'Inconnu';
         const perPerson = (amount / participants.length).toFixed(2);
         showSuccessMessage(`${paidByName} a payé ${amount.toFixed(2)}€ (${perPerson}€/pers)`);
@@ -1513,7 +1499,8 @@
             return;
         }
         
-        // Initialiser le tableau des virements s'il n'existe pas
+        const savedTab = currentTab;
+        
         if (!appData.transfers) {
             appData.transfers = [];
         }
@@ -1527,8 +1514,8 @@
         });
         
         saveData();
-        renderApp();
         closeModal('addTransferModal');
+        renderApp(savedTab);
         trackUserAction();
         showSuccessMessage('Virement ajouté !');
     }
@@ -2291,7 +2278,6 @@
             return;
         }
         
-        // Récupérer les participants sélectionnés
         const participants = [];
         document.querySelectorAll('#editParticipantsList input[type="checkbox"]:checked').forEach(checkbox => {
             participants.push(checkbox.value);
@@ -2302,7 +2288,8 @@
             return;
         }
         
-        // Mettre à jour la dépense
+        const savedTab = currentTab;
+        
         appData.commonExpenses[index] = {
             ...appData.commonExpenses[index],
             name: name,
@@ -2314,8 +2301,8 @@
         };
         
         saveData();
-        renderApp();
         closeModal('editCommonExpenseModal');
+        renderApp(savedTab);
         showNotification('✅ Dépense modifiée !', 'success');
     }
 	
