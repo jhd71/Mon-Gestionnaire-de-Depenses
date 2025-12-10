@@ -598,47 +598,54 @@
     let actionCount = 0;
     let sessionStart = Date.now();
 
-    // Initialisation
-    document.addEventListener('DOMContentLoaded', () => {
-    // Appliquer le thème sauvegardé ou celui déjà défini par le script du head
-    const preferredTheme = localStorage.getItem('preferredTheme') || 
-                          document.body.getAttribute('data-theme') || 
-                          'dark';
-    
-    document.body.setAttribute('data-theme', preferredTheme);
-    document.documentElement.setAttribute('data-theme', preferredTheme);
-    
-    // Forcer la synchronisation du thème après le chargement des données
-    if (appData.theme !== preferredTheme) {
-        appData.theme = preferredTheme;
-        saveData();
-    }
-    
-    loadData();
-    checkUrlImport();
-    initSecurity();
-    syncTheme();
-    initPWA();
-    renderApp();
-    initDonation();
-    
-    // Vérification anti-bug : détecter si l'affichage est vide alors qu'il y a des données
-    setTimeout(() => {
-        checkAndFixEmptyDisplay();
-    }, 500);
+    // Fonction d'initialisation principale
+    function initializeApp() {
+        console.log('🚀 Initialisation de l\'application...');
         
-        // Masquer le FAB au démarrage si on est sur le tableau de bord
-        if (appData.currentTab === 'dashboard') {
-            document.getElementById('fabButton').style.display = 'none';
+        // Appliquer le thème sauvegardé
+        const preferredTheme = localStorage.getItem('preferredTheme') || 
+                              document.body.getAttribute('data-theme') || 
+                              'dark';
+        
+        document.body.setAttribute('data-theme', preferredTheme);
+        document.documentElement.setAttribute('data-theme', preferredTheme);
+        
+        // Charger les données
+        loadData();
+        
+        // Forcer la synchronisation du thème
+        if (appData.theme !== preferredTheme) {
+            appData.theme = preferredTheme;
         }
         
+        checkUrlImport();
+        initSecurity();
+        syncTheme();
+        initPWA();
+        
+        // RENDU PRINCIPAL
+        renderApp();
+        console.log('✅ renderApp() exécuté');
+        
+        initDonation();
+        
+        // Masquer le FAB au démarrage si on est sur le tableau de bord
+        const fabButton = document.getElementById('fabButton');
+        if (fabButton && appData.currentTab === 'dashboard') {
+            fabButton.style.display = 'none';
+        }
+        
+        // Vérifications anti-bug multiples
+        setTimeout(checkAndFixEmptyDisplay, 300);
+        setTimeout(checkAndFixEmptyDisplay, 1000);
+        setTimeout(checkAndFixEmptyDisplay, 3000);
+        
         // Surcharge de exportData pour le tracking
-        const originalExportData = exportData;
+        const originalExportData = window.exportData || exportData;
         window.exportData = function() {
             originalExportData();
             trackUserAction();
             
-            // Message contextuel après export (seulement une fois)
             if (!localStorage.getItem('exportDonationSuggested')) {
                 setTimeout(() => {
                     if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
@@ -649,7 +656,31 @@
             }
         };
         
-        setInterval(saveData, 5000); // Sauvegarde automatique toutes les 5 secondes
+        // Sauvegarde automatique
+        setInterval(saveData, 5000);
+        
+        console.log('✅ Application initialisée avec succès');
+    }
+    
+    // TRIPLE SÉCURITÉ pour le démarrage
+    // 1. DOMContentLoaded classique
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+        // 2. DOM déjà prêt (cas du cache Service Worker)
+        initializeApp();
+    }
+    
+    // 3. Sécurité supplémentaire avec window.onload
+    window.addEventListener('load', () => {
+        console.log('📄 window.load déclenché');
+        setTimeout(() => {
+            const dashboardContent = document.getElementById('dashboard-content');
+            if (!dashboardContent || dashboardContent.innerHTML.trim() === '') {
+                console.warn('🔄 Écran vide détecté après load, réinitialisation...');
+                initializeApp();
+            }
+        }, 100);
     });
 
 // ========== NAVIGATION PAR SWIPE ==========
@@ -810,34 +841,57 @@
 // Vérifier et corriger l'affichage vide
     function checkAndFixEmptyDisplay() {
         const dashboardContent = document.getElementById('dashboard-content');
+        const tabsContainer = document.getElementById('tabs');
         const saved = localStorage.getItem('expenseTrackerData');
         
-        // Si le dashboard est vide mais qu'il y a des données sauvegardées
-        if (dashboardContent && dashboardContent.innerHTML.trim() === '' && saved) {
-            console.warn('🔄 Affichage vide détecté, rechargement des données...');
+        // Vérifier si l'affichage est vide (dashboard OU onglets vides)
+        const isDashboardEmpty = !dashboardContent || dashboardContent.innerHTML.trim() === '';
+        const areTabsEmpty = !tabsContainer || tabsContainer.innerHTML.trim() === '';
+        
+        if ((isDashboardEmpty || areTabsEmpty) && saved) {
+            console.warn('🔄 Affichage vide détecté !');
+            console.log('Dashboard vide:', isDashboardEmpty);
+            console.log('Onglets vides:', areTabsEmpty);
             
             try {
                 const parsedData = JSON.parse(saved);
                 const userCount = Object.keys(parsedData.users || {}).length;
                 
+                console.log('Nombre d\'utilisateurs en mémoire:', userCount);
+                
                 if (userCount > 0) {
-                    // Il y a des données mais l'affichage est vide = bug
-                    console.log('🔄 Rechargement automatique...');
+                    console.log('🔄 Rechargement automatique des données...');
                     loadData();
                     renderApp();
                     
-                    // Si toujours vide après 1 seconde, forcer le rechargement de la page
+                    // Vérifier à nouveau après un court délai
                     setTimeout(() => {
-                        const newContent = document.getElementById('dashboard-content');
-                        if (newContent && newContent.innerHTML.trim() === '') {
-                            console.log('🔄 Forçage du rechargement de la page...');
-                            window.location.reload();
+                        const newDashboard = document.getElementById('dashboard-content');
+                        const newTabs = document.getElementById('tabs');
+                        
+                        if ((!newDashboard || newDashboard.innerHTML.trim() === '') ||
+                            (!newTabs || newTabs.innerHTML.trim() === '')) {
+                            console.log('🔄 Toujours vide, forçage du rechargement de la page...');
+                            // Utiliser une approche différente pour éviter une boucle infinie
+                            if (!sessionStorage.getItem('reloadAttempted')) {
+                                sessionStorage.setItem('reloadAttempted', 'true');
+                                window.location.reload();
+                            } else {
+                                console.error('❌ Rechargement déjà tenté, problème persistant');
+                                sessionStorage.removeItem('reloadAttempted');
+                            }
+                        } else {
+                            console.log('✅ Affichage restauré avec succès !');
+                            sessionStorage.removeItem('reloadAttempted');
                         }
-                    }, 1000);
+                    }, 500);
                 }
             } catch (e) {
                 console.error('Erreur vérification:', e);
             }
+        } else if (!isDashboardEmpty && !areTabsEmpty) {
+            // Tout va bien, nettoyer le flag
+            sessionStorage.removeItem('reloadAttempted');
         }
     }
     
@@ -857,6 +911,31 @@
             checkAndFixEmptyDisplay();
         }, 200);
     });
+	
+	// Vérifier quand la page est restaurée depuis le cache (bouton retour, PWA)
+    window.addEventListener('pageshow', (event) => {
+        console.log('📱 pageshow déclenché, persisted:', event.persisted);
+        if (event.persisted) {
+            // La page a été restaurée depuis le cache
+            console.log('🔄 Page restaurée depuis le cache, vérification...');
+            setTimeout(() => {
+                checkAndFixEmptyDisplay();
+            }, 100);
+        }
+    });
+    
+    // Vérification au réveil après mise en veille
+    let lastActiveTime = Date.now();
+    setInterval(() => {
+        const now = Date.now();
+        // Si plus de 5 secondes se sont écoulées depuis la dernière vérification
+        // (indique que l'appareil était peut-être en veille)
+        if (now - lastActiveTime > 5000) {
+            console.log('📱 Appareil réveillé, vérification affichage...');
+            checkAndFixEmptyDisplay();
+        }
+        lastActiveTime = now;
+    }, 1000);
 	
     // Fonctions de donation
     function trackUserAction() {
