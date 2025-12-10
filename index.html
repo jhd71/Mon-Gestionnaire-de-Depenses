@@ -120,25 +120,36 @@
     </button>
     
     <div class="fab-menu" id="fabMenu">
-        <button class="fab-item" onclick="quickAddIncome()" title="Ajouter un revenu">
-            <span class="fab-label">Revenu</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                <path d="M12 2v20M17 7l-5-5-5 5M17 17l-5-5-5 5"/>
-            </svg>
+        <button class="fab-item" onclick="quickAddIncome()">
+            <span class="fab-label">💵 Ajouter un revenu</span>
+            <div class="fab-item-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+            </div>
         </button>
-        <button class="fab-item" onclick="quickAddExpense()" title="Ajouter une dépense">
-            <span class="fab-label">Dépense</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                <path d="M12 2v20M7 7l5 5 5-5M7 17l5-5 5 5"/>
-            </svg>
+        <button class="fab-item" onclick="quickAddExpense()">
+            <span class="fab-label">🛒 Ajouter une dépense</span>
+            <div class="fab-item-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+                    <path d="M5 12h14"/>
+                </svg>
+            </div>
         </button>
-        <button class="fab-item" onclick="toggleCalculator()" title="Calculatrice">
-            <span class="fab-label">Calculer</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                <rect x="4" y="2" width="16" height="20" rx="2"></rect>
-                <line x1="8" y1="6" x2="16" y2="6"></line>
-                <line x1="8" y1="10" x2="16" y2="10"></line>
-            </svg>
+        <button class="fab-item" onclick="toggleCalculator()">
+            <span class="fab-label">🧮 Calculatrice</span>
+            <div class="fab-item-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <rect x="4" y="2" width="16" height="20" rx="2"/>
+                    <line x1="8" y1="6" x2="16" y2="6"/>
+                    <circle cx="8" cy="12" r="1" fill="white"/>
+                    <circle cx="12" cy="12" r="1" fill="white"/>
+                    <circle cx="16" cy="12" r="1" fill="white"/>
+                    <circle cx="8" cy="16" r="1" fill="white"/>
+                    <circle cx="12" cy="16" r="1" fill="white"/>
+                    <circle cx="16" cy="16" r="1" fill="white"/>
+                </svg>
+            </div>
         </button>
     </div>
 
@@ -709,7 +720,8 @@
         const tabs = getTabsOrder();
         const currentIndex = tabs.indexOf(currentTab);
         if (currentIndex > 0) {
-            switchTab(tabs[currentIndex - 1]);
+            const newTab = tabs[currentIndex - 1];
+            switchTab(newTab);
             showSwipeIndicator('◀', 'left');
         }
     }
@@ -719,7 +731,8 @@
         const tabs = getTabsOrder();
         const currentIndex = tabs.indexOf(currentTab);
         if (currentIndex < tabs.length - 1) {
-            switchTab(tabs[currentIndex + 1]);
+            const newTab = tabs[currentIndex + 1];
+            switchTab(newTab);
             showSwipeIndicator('▶', 'right');
         }
     }
@@ -1078,6 +1091,37 @@
         }
     }
 
+// Faire défiler les onglets pour montrer l'onglet actif
+    function scrollTabIntoView(tabId) {
+        const tabsContainer = document.getElementById('tabs');
+        if (!tabsContainer) return;
+        
+        const allTabs = tabsContainer.querySelectorAll('.tab');
+        let activeTab = null;
+        
+        allTabs.forEach(tab => {
+            const tabText = tab.textContent;
+            if (tabId === 'dashboard' && tabText === 'Tableau de bord') {
+                activeTab = tab;
+            } else if (tabId === 'commun' && tabText === 'Balance') {
+                activeTab = tab;
+            } else if (appData.users[tabId] && tabText === appData.users[tabId].name) {
+                activeTab = tab;
+            }
+        });
+        
+        if (activeTab) {
+            const tabRect = activeTab.getBoundingClientRect();
+            const containerRect = tabsContainer.getBoundingClientRect();
+            const scrollLeft = activeTab.offsetLeft - (containerRect.width / 2) + (tabRect.width / 2);
+            
+            tabsContainer.scrollTo({
+                left: Math.max(0, scrollLeft),
+                behavior: 'smooth'
+            });
+        }
+    }
+	
     function renderTabs() {
         const container = document.getElementById('tabs');
         container.innerHTML = '';
@@ -1326,6 +1370,7 @@
     function switchTab(tabId) {
         applyActiveTab(tabId);
         saveData();
+        scrollTabIntoView(tabId);
     }
 
     function addNewTab() {
@@ -2404,17 +2449,17 @@
         
         if (fabMenuOpen) {
             fabMenu.classList.add('active');
-            fabButton.style.transform = 'rotate(45deg)';
+            fabButton.classList.add('active');
         } else {
             fabMenu.classList.remove('active');
-            fabButton.style.transform = 'rotate(0deg)';
+            fabButton.classList.remove('active');
         }
     }
     
     function closeFabMenu() {
         fabMenuOpen = false;
         document.getElementById('fabMenu').classList.remove('active');
-        document.getElementById('fabButton').style.transform = 'rotate(0deg)';
+        document.getElementById('fabButton').classList.remove('active');
     }
 
     // Ajout rapide de revenu
