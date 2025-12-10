@@ -1001,11 +1001,11 @@
         const totalIncome = user.incomes.reduce((sum, item) => sum + item.amount, 0);
         let totalExpense = user.expenses.reduce((sum, item) => sum + item.amount, 0);
         
-        // Pour la carte "Commun", ajouter le total des dépenses communes
+        // Pour la carte "Commun", utiliser le total exact des dépenses communes
         if (userId === 'commun') {
-            appData.commonExpenses.forEach(expense => {
-                totalExpense += expense.amount;
-            });
+            // Calculer le total exact sans arrondi intermédiaire
+            const totalCommon = appData.commonExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+            totalExpense = totalCommon;
         }
         
         // Calculer la part des dépenses communes pour les utilisateurs
@@ -1058,7 +1058,7 @@
                     <div class="stat-card expense">
                         <div class="stat-icon">📉</div>
                         <div class="stat-label">Dépenses</div>
-                        <div class="stat-value">-${(totalExpense + commonShare).toFixed(2)}€</div>
+                        <div class="stat-value">-${userId === 'commun' ? totalExpense.toFixed(2) : (totalExpense + commonShare).toFixed(2)}€</div>
                     </div>
                 </div>
                 <div class="balance-card ${isPositive ? 'positive' : 'negative'}">
@@ -1679,6 +1679,14 @@
         
         saveData();
         renderApp();
+        
+        // Réactiver visuellement l'onglet Balance
+        setTimeout(() => {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            const balanceTab = Array.from(document.querySelectorAll('.tab')).find(tab => tab.textContent === 'Balance');
+            if (balanceTab) balanceTab.classList.add('active');
+        }, 50);
+        
         showNotification(`✅ ${fromName} a remboursé ${amount.toFixed(2)}€ à ${toName}`, 'success');
     }
     
@@ -1698,6 +1706,14 @@
         appData.transfers.splice(index, 1);
         saveData();
         renderApp();
+        
+        // Réactiver visuellement l'onglet Balance
+        setTimeout(() => {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            const balanceTab = Array.from(document.querySelectorAll('.tab')).find(tab => tab.textContent === 'Balance');
+            if (balanceTab) balanceTab.classList.add('active');
+        }, 50);
+        
         showNotification('🔄 Remboursement annulé, dette réactivée', 'info');
     }
 	
