@@ -1802,3 +1802,73 @@ select.input {
     background: rgba(245, 158, 11, 0.2);
     transform: scale(1.1);
 }
+
+/* ===========================
+   NAVIGATION PAR SWIPE
+   =========================== */
+@keyframes swipeFade {
+    0% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50%) scale(1.5);
+    }
+}
+
+.swipe-indicator {
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Animation de transition des onglets */
+.tab-content {
+    transition: opacity 0.2s ease-out;
+}
+
+.tab-content.active {
+    animation: slideIn 0.25s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0.5;
+        transform: translateX(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Indicateur visuel de swipe possible (optionnel) */
+.content {
+    touch-action: pan-y pinch-zoom;
+}
+
+/* Effet de feedback sur les bords */
+.swipe-edge-indicator {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    background: linear-gradient(to right, var(--primary), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    z-index: 9998;
+}
+
+.swipe-edge-indicator.left {
+    left: 0;
+}
+
+.swipe-edge-indicator.right {
+    right: 0;
+    background: linear-gradient(to left, var(--primary), transparent);
+}
+
+.swipe-edge-indicator.active {
+    opacity: 0.5;
+}

@@ -616,11 +616,16 @@
     
     loadData();
     checkUrlImport();
-	initSecurity();
-	syncTheme();
+    initSecurity();
+    syncTheme();
     initPWA();
     renderApp();
     initDonation();
+    
+    // Vérification anti-bug : détecter si l'affichage est vide alors qu'il y a des données
+    setTimeout(() => {
+        checkAndFixEmptyDisplay();
+    }, 500);
         
         // Masquer le FAB au démarrage si on est sur le tableau de bord
         if (appData.currentTab === 'dashboard') {
@@ -649,9 +654,30 @@
 
     // Fonctions de gestion des données
     function loadData() {
-    const saved = localStorage.getItem('expenseTrackerData');
-    if (saved) {
-        appData = JSON.parse(saved);
+    try {
+        const saved = localStorage.getItem('expenseTrackerData');
+        if (saved) {
+            const parsedData = JSON.parse(saved);
+            
+            // Vérifier que les données sont valides
+            if (parsedData && parsedData.users) {
+                appData = parsedData;
+                // Synchroniser currentTab avec les données chargées
+                currentTab = appData.currentTab || 'dashboard';
+                console.log('✅ Données chargées:', Object.keys(appData.users).length, 'utilisateurs');
+            } else {
+                console.warn('⚠️ Données invalides, utilisation des données par défaut');
+            }
+        }
+        
+        // S'assurer que les structures de base existent
+        if (!appData.users) appData.users = { 'commun': { name: 'Commun', incomes: [], expenses: [] } };
+        if (!appData.commonExpenses) appData.commonExpenses = [];
+        if (!appData.transfers) appData.transfers = [];
+        
+    } catch (error) {
+        console.error('❌ Erreur chargement données:', error);
+        // En cas d'erreur, garder les données par défaut
     }
     
     // Charger le thème préféré de l'utilisateur
@@ -671,6 +697,233 @@
         localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
     }
 
+// Vérifier et corriger l'affichage vide
+    function checkAndFixEmptyDisplay() {
+        const dashboardContent = document.getElementById('dashboard-content');
+        const saved = localStorage.getItem('expenseTrackerData');
+        
+        // Si le dashboard est vide mais qu'il y a des données sauvegardées
+        if (dashboardContent && dashboardContent.innerHTML.trim() === '' && saved) {
+            console.warn('🔄 Affichage vide détecté, rechargement des données...');
+            
+            try {
+                const parsedData = JSON.parse(saved);
+                const userCount = Object.keys(parsedData.users || {}).length;
+                
+                if (userCount > 0) {
+                    // Il y a des données mais l'affichage est vide = bug
+                    console.log('🔄 Rechargement automatique...');
+                    loadData();
+                    renderApp();
+                    
+                    // Si toujours vide après 1 seconde, forcer le rechargement de la page
+                    setTimeout(() => {
+                        const newContent = document.getElementById('dashboard-content');
+                        if (newContent && newContent.innerHTML.trim() === '') {
+                            console.log('🔄 Forçage du rechargement de la page...');
+                            window.location.reload();
+                        }
+                    }, 1000);
+                }
+            } catch (e) {
+                console.error('Erreur vérification:', e);
+            }
+        }
+    }
+    
+    // Vérifier aussi quand l'app revient au premier plan (mobile)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            console.log('📱 App revenue au premier plan');
+            setTimeout(() => {
+                checkAndFixEmptyDisplay();
+            }, 200);
+        }
+    });
+    
+    // Vérifier quand la fenêtre reprend le focus
+    window.addEventListener('focus', () => {
+        setTimeout(() => {
+            checkAndFixEmptyDisplay();
+        }, 200);
+    });
+	
+	// ========== NAVIGATION PAR SWIPE ==========
+    
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 80; // Distance minimum pour déclencher un swipe
+    const maxVerticalDistance = 100; // Distance verticale max pour considérer comme swipe horizontal
+    
+    // Obtenir la liste ordonnée des onglets
+    function getTabsOrder() {
+        const tabs = ['dashboard'];
+        
+        // Ajouter les utilisateurs dans l'ordre
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                tabs.push(userId);
+            }
+        }
+        
+        // Ajouter Balance (commun) à la fin
+        tabs.push('commun');
+        
+        return tabs;
+    }
+    
+    // Naviguer vers l'onglet précédent
+    function goToPreviousTab() {
+        const tabs = getTabsOrder();
+        const currentIndex = tabs.indexOf(currentTab);
+        
+        if (currentIndex > 0) {
+            const previousTab = tabs[currentIndex - 1];
+            switchTab(previousTab);
+            showSwipeIndicator('◀', 'left');
+        } else {
+            // Déjà au premier onglet - petit feedback visuel
+            showSwipeIndicator('⊘', 'left');
+        }
+    }
+    
+    // Naviguer vers l'onglet suivant
+    function goToNextTab() {
+        const tabs = getTabsOrder();
+        const currentIndex = tabs.indexOf(currentTab);
+        
+        if (currentIndex < tabs.length - 1) {
+            const nextTab = tabs[currentIndex + 1];
+            switchTab(nextTab);
+            showSwipeIndicator('▶', 'right');
+        } else {
+            // Déjà au dernier onglet - petit feedback visuel
+            showSwipeIndicator('⊘', 'right');
+        }
+    }
+    
+    // Afficher un indicateur de swipe
+    function showSwipeIndicator(symbol, direction) {
+        // Supprimer l'ancien indicateur s'il existe
+        const existing = document.querySelector('.swipe-indicator');
+        if (existing) existing.remove();
+        
+        const indicator = document.createElement('div');
+        indicator.className = 'swipe-indicator';
+        indicator.textContent = symbol;
+        indicator.style.cssText = `
+            position: fixed;
+            top: 50%;
+            ${direction === 'left' ? 'left: 20px' : 'right: 20px'};
+            transform: translateY(-50%);
+            font-size: 2rem;
+            color: var(--primary);
+            background: var(--bg-secondary);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            animation: swipeFade 0.4s ease-out forwards;
+            pointer-events: none;
+        `;
+        
+        document.body.appendChild(indicator);
+        
+        setTimeout(() => indicator.remove(), 400);
+    }
+    
+    // Gestionnaire tactile - début du toucher
+    function handleTouchStart(e) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }
+    
+	// Gestionnaire tactile - pendant le mouvement (optionnel, pour feedback visuel)
+    function handleTouchMove(e) {
+        const currentX = e.touches[0].clientX;
+        const deltaX = currentX - touchStartX;
+        
+        // Afficher un indicateur sur le bord si on swipe assez
+        if (Math.abs(deltaX) > 30) {
+            showEdgeIndicator(deltaX > 0 ? 'left' : 'right');
+        } else {
+            hideEdgeIndicators();
+        }
+    }
+    
+    // Afficher l'indicateur de bord
+    function showEdgeIndicator(side) {
+        hideEdgeIndicators();
+        
+        let indicator = document.querySelector(`.swipe-edge-indicator.${side}`);
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = `swipe-edge-indicator ${side}`;
+            document.body.appendChild(indicator);
+        }
+        indicator.classList.add('active');
+    }
+    
+    // Masquer les indicateurs de bord
+    function hideEdgeIndicators() {
+        document.querySelectorAll('.swipe-edge-indicator').forEach(el => {
+            el.classList.remove('active');
+        });
+    }
+    
+    // Ajouter le gestionnaire de mouvement
+    if (contentArea) {
+        contentArea.addEventListener('touchmove', handleTouchMove, { passive: true });
+        contentArea.addEventListener('touchend', () => hideEdgeIndicators(), { passive: true });
+        contentArea.addEventListener('touchcancel', () => hideEdgeIndicators(), { passive: true });
+    }
+	
+    // Gestionnaire tactile - fin du toucher
+    function handleTouchEnd(e) {
+        touchEndX = e.changedTouches[0].clientX;
+        touchEndY = e.changedTouches[0].clientY;
+        handleSwipe();
+    }
+    
+    // Analyser et traiter le swipe
+    function handleSwipe() {
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        
+        // Vérifier que c'est un swipe horizontal (pas vertical)
+        if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaY) < maxVerticalDistance) {
+            if (deltaX > 0) {
+                // Swipe vers la droite → onglet précédent
+                goToPreviousTab();
+            } else {
+                // Swipe vers la gauche → onglet suivant
+                goToNextTab();
+            }
+        }
+    }
+    
+    // Activer le swipe sur la zone de contenu
+    const contentArea = document.querySelector('.content');
+    if (contentArea) {
+        contentArea.addEventListener('touchstart', handleTouchStart, { passive: true });
+        contentArea.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
+    
+    // Activer aussi sur le dashboard
+    document.addEventListener('DOMContentLoaded', () => {
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard) {
+            dashboard.addEventListener('touchstart', handleTouchStart, { passive: true });
+            dashboard.addEventListener('touchend', handleTouchEnd, { passive: true });
+        }
+    });
+	
     // Fonctions de donation
     function trackUserAction() {
         actionCount++;
