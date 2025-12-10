@@ -1018,19 +1018,6 @@
             });
         }
         
-        // Calculer les virements (argent détenu pour d'autres)
-        let transferBalance = 0;
-        if (appData.transfers && userId !== 'commun') {
-            appData.transfers.forEach(transfer => {
-                if (transfer.from === userId) {
-                    transferBalance -= transfer.amount;
-                }
-                if (transfer.to === userId) {
-                    transferBalance += transfer.amount;
-                }
-            });
-        }
-        
         const balance = totalIncome - totalExpense - commonShare;
         const isPositive = balance >= 0;
         
@@ -1040,13 +1027,17 @@
         // Emoji selon le type
         const emoji = userId === 'commun' ? '👥' : '👤';
         
-        // Info virement
+        // Info dette : utiliser calculateBalance() pour cohérence avec la section Balance
         let transferInfo = '';
-        if (transferBalance !== 0 && userId !== 'commun') {
-            if (transferBalance > 0) {
-                transferInfo = `<div class="transfer-info" style="color: var(--success);">💰 +${transferBalance.toFixed(2)}€ à récupérer</div>`;
-            } else {
-                transferInfo = `<div class="transfer-info" style="color: var(--danger);">💸 ${transferBalance.toFixed(2)}€ à rembourser</div>`;
+        if (userId !== 'commun') {
+            const allBalances = calculateBalance();
+            const userDebtBalance = allBalances[userId] || 0;
+            
+            // Seuil pour éviter les erreurs d'arrondi
+            if (userDebtBalance > 0.01) {
+                transferInfo = `<div class="transfer-info" style="color: var(--success);">💰 +${userDebtBalance.toFixed(2)}€ à récupérer</div>`;
+            } else if (userDebtBalance < -0.01) {
+                transferInfo = `<div class="transfer-info" style="color: var(--danger);">💸 ${userDebtBalance.toFixed(2)}€ à rembourser</div>`;
             }
         }
         
