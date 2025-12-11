@@ -1512,7 +1512,7 @@
         document.getElementById('avatarPreview').innerHTML = `<span style="font-size: 3rem;">${avatar}</span>`;
         
         // Mettre à jour les classes de sélection
-        document.querySelectorAll('AvatarGrid .avatar-option').forEach(btn => {
+        document.querySelectorAll('.avatar-option').forEach(btn => {
             btn.classList.remove('selected');
             if (btn.textContent === avatar) {
                 btn.classList.add('selected');
