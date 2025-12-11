@@ -577,12 +577,13 @@ body::before {
     font-size: 0.875rem;
     font-weight: 600;
     transition: all var(--transition-fast);
-    display: inline-flex;
+    display: inline-flex !important;
     gap: 0.5rem;
     position: relative;
     overflow: hidden;
     box-shadow: var(--shadow), 0 0 20px var(--primary-glow);
-    justify-content: space-around;
+    justify-content: center;
+    align-items: center;
 }
 
 .btn:hover {
