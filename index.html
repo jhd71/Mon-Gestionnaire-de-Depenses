@@ -163,11 +163,11 @@
                 <input type="text" class="input" id="newTabName" placeholder="Nom de l'utilisateur" style="margin-bottom: 1rem;">
                 
                 <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Choisir un avatar :</label>
-                <div class="avatar-preview" id="avatarPreview" style="text-align: center; margin-bottom: 1rem;">
+                <div id="avatarPreview" style="text-align: center; margin-bottom: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 12px;">
                     <span style="font-size: 3rem;">👤</span>
                 </div>
-                <div class="avatar-grid" id="avatarGrid">
-                    <!-- Les avatars seront générés par JavaScript -->
+                <div id="avatarGrid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 12px; max-height: 200px; overflow-y: auto;">
+                    <!-- Avatars générés par JavaScript -->
                 </div>
             </div>
             <div class="modal-footer">
@@ -1490,45 +1490,40 @@
 
     function addNewTab() {
         document.getElementById('newTabName').value = '';
-        selectedAvatar = '👤'; // Réinitialiser l'avatar
+        selectedAvatar = '👤';
         
         // Mettre à jour la prévisualisation
-        document.getElementById('avatarPreview').innerHTML = `<span style="font-size: 3rem;">${selectedAvatar}</span>`;
+        document.getElementById('avatarPreview').innerHTML = '<span style="font-size: 3rem;">👤</span>';
         
-        // Générer la grille d'avatars avec styles inline pour garantir l'affichage
+        // Générer la grille d'avatars avec HTML complet
         const grid = document.getElementById('avatarGrid');
-        grid.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 0.5rem;
-            padding: 0.75rem;
-            background: var(--bg-tertiary);
-            border-radius: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-        `;
         
-        grid.innerHTML = availableAvatars.map(avatar => `
-            <button type="button" 
-                    class="avatar-option ${avatar === selectedAvatar ? 'selected' : ''}" 
+        let buttonsHTML = '';
+        availableAvatars.forEach(avatar => {
+            const isSelected = avatar === selectedAvatar;
+            buttonsHTML += `
+                <button type="button" 
                     onclick="selectAvatar('${avatar}')"
                     style="
-                        width: 100%;
-                        min-width: 40px;
-                        min-height: 40px;
-                        aspect-ratio: 1;
-                        font-size: 1.5rem;
-                        border: 2px solid ${avatar === selectedAvatar ? 'var(--primary)' : 'transparent'};
-                        background: ${avatar === selectedAvatar ? 'rgba(139, 92, 246, 0.3)' : 'var(--bg-secondary)'};
-                        border-radius: 8px;
+                        width: 44px;
+                        height: 44px;
+                        font-size: 24px;
+                        border: ${isSelected ? '3px solid #8b5cf6' : '2px solid #374151'};
+                        background: ${isSelected ? 'rgba(139, 92, 246, 0.3)' : '#1f2937'};
+                        border-radius: 10px;
                         cursor: pointer;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         padding: 0;
-                        transition: all 0.2s ease;
-                    ">${avatar}</button>
-        `).join('');
+                        margin: 0;
+                        box-shadow: ${isSelected ? '0 0 12px rgba(139, 92, 246, 0.5)' : 'none'};
+                    "
+                >${avatar}</button>
+            `;
+        });
+        
+        grid.innerHTML = buttonsHTML;
         
         openModal('addTabModal');
     }
@@ -1537,14 +1532,19 @@
         selectedAvatar = avatar;
         
         // Mettre à jour la prévisualisation
-        document.getElementById('avatarPreview').innerHTML = `<span style="font-size: 3rem;">${avatar}</span>`;
+        document.getElementById('avatarPreview').innerHTML = '<span style="font-size: 3rem;">' + avatar + '</span>';
         
-        // Mettre à jour les styles de sélection sur tous les boutons
-        document.querySelectorAll('#avatarGrid .avatar-option').forEach(btn => {
-            const isSelected = btn.textContent.trim() === avatar;
-            btn.style.border = isSelected ? '2px solid var(--primary)' : '2px solid transparent';
-            btn.style.background = isSelected ? 'rgba(139, 92, 246, 0.3)' : 'var(--bg-secondary)';
-            btn.style.boxShadow = isSelected ? '0 0 15px rgba(139, 92, 246, 0.4)' : 'none';
+        // Mettre à jour visuellement tous les boutons
+        const grid = document.getElementById('avatarGrid');
+        const buttons = grid.querySelectorAll('button');
+        
+        buttons.forEach(btn => {
+            const btnAvatar = btn.textContent.trim();
+            const isSelected = btnAvatar === avatar;
+            
+            btn.style.border = isSelected ? '3px solid #8b5cf6' : '2px solid #374151';
+            btn.style.background = isSelected ? 'rgba(139, 92, 246, 0.3)' : '#1f2937';
+            btn.style.boxShadow = isSelected ? '0 0 12px rgba(139, 92, 246, 0.5)' : 'none';
         });
     }
 
