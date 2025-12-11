@@ -177,6 +177,26 @@
         </div>
     </div>
 
+<!-- Modal pour modifier l'avatar d'un utilisateur -->
+    <div class="modal" id="changeAvatarModal">
+        <div class="modal-content">
+            <div class="modal-header">Modifier l'avatar</div>
+            <div class="modal-body">
+                <input type="hidden" id="changeAvatarUserId">
+                <div class="avatar-preview" id="changeAvatarPreview" style="text-align: center; margin-bottom: 1rem;">
+                    <span style="font-size: 3rem;">👤</span>
+                </div>
+                <div class="avatar-grid" id="changeAvatarGrid">
+                    <!-- Les avatars seront générés par JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('changeAvatarModal')">Annuler</button>
+                <button class="btn" onclick="confirmChangeAvatar()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+	
     <!-- Modal pour ajouter un revenu -->
     <div class="modal" id="addIncomeModal">
         <div class="modal-content">
@@ -1343,7 +1363,22 @@
                 tabContent.id = userId;
                 tabContent.className = 'tab-content user-tab-content';
                 
+                const userAvatar = appData.users[userId].avatar || '👤';
+                
                 tabContent.innerHTML = `
+                    <div class="section user-profile-section">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <button class="user-avatar-btn" onclick="changeUserAvatar('${userId}')" title="Modifier l'avatar">
+                                <span class="user-avatar-large">${userAvatar}</span>
+                                <span class="avatar-edit-icon">✏️</span>
+                            </button>
+                            <div>
+                                <h2 style="margin: 0; font-size: 1.25rem;">${appData.users[userId].name}</h2>
+                                <span style="font-size: 0.75rem; color: var(--text-secondary);">Cliquez sur l'avatar pour le modifier</span>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="section">
                         <div class="section-header">
                             <h2 class="section-title">Revenus</h2>
@@ -1485,6 +1520,53 @@
         });
     }
 
+// ========== MODIFICATION D'AVATAR UTILISATEUR ==========
+    
+    let avatarToChange = '👤';
+    let userIdToChangeAvatar = null;
+    
+    function changeUserAvatar(userId) {
+        userIdToChangeAvatar = userId;
+        avatarToChange = appData.users[userId].avatar || '👤';
+        
+        // Générer la grille d'avatars
+        const grid = document.getElementById('changeAvatarGrid');
+        grid.innerHTML = availableAvatars.map(avatar => `
+            <button type="button" class="avatar-option ${avatar === avatarToChange ? 'selected' : ''}" 
+                    onclick="selectAvatarToChange('${avatar}')">${avatar}</button>
+        `).join('');
+        
+        // Mettre à jour la prévisualisation
+        document.getElementById('changeAvatarPreview').innerHTML = `<span style="font-size: 3rem;">${avatarToChange}</span>`;
+        
+        openModal('changeAvatarModal');
+    }
+    
+    function selectAvatarToChange(avatar) {
+        avatarToChange = avatar;
+        
+        // Mettre à jour la prévisualisation
+        document.getElementById('changeAvatarPreview').innerHTML = `<span style="font-size: 3rem;">${avatar}</span>`;
+        
+        // Mettre à jour les classes de sélection
+        document.querySelectorAll('#changeAvatarGrid .avatar-option').forEach(btn => {
+            btn.classList.remove('selected');
+            if (btn.textContent === avatar) {
+                btn.classList.add('selected');
+            }
+        });
+    }
+    
+    function confirmChangeAvatar() {
+        if (userIdToChangeAvatar && appData.users[userIdToChangeAvatar]) {
+            appData.users[userIdToChangeAvatar].avatar = avatarToChange;
+            saveData();
+            closeModal('changeAvatarModal');
+            renderApp(userIdToChangeAvatar);
+            showNotification('✅ Avatar modifié !', 'success');
+        }
+    }
+	
     function confirmAddTab() {
         const name = document.getElementById('newTabName').value.trim();
         if (name) {

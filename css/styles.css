@@ -1615,41 +1615,46 @@ body::before {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 0.5rem;
-    padding: 0.5rem;
-    background: var(--bg-glass);
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
     border-radius: var(--radius-lg);
-    max-height: 200px;
+    max-height: 180px;
     overflow-y: auto;
 }
 
 .avatar-option {
     width: 100%;
     aspect-ratio: 1;
+    min-height: 40px;
     font-size: 1.5rem;
     border: 2px solid transparent;
-    background: var(--bg-tertiary);
+    background: var(--bg-secondary);
     border-radius: var(--radius);
     cursor: pointer;
     transition: all var(--transition-fast);
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 0;
+    color: inherit;
+    line-height: 1;
 }
 
 .avatar-option:hover {
     background: var(--bg-glass-hover);
     transform: scale(1.1);
+    border-color: var(--primary-light);
 }
 
 .avatar-option.selected {
     border-color: var(--primary);
-    background: rgba(139, 92, 246, 0.2);
+    background: rgba(139, 92, 246, 0.3);
     box-shadow: 0 0 15px var(--primary-glow);
 }
 
 .avatar-preview {
     padding: 1rem;
-    background: var(--bg-glass);
+    background: var(--bg-tertiary);
     border-radius: var(--radius-xl);
     border: var(--glass-border);
 }
@@ -1662,5 +1667,64 @@ body::before {
     
     .avatar-option {
         font-size: 1.25rem;
+        min-height: 36px;
     }
+}
+
+/* ===========================
+   🎭 AVATAR MODIFIABLE UTILISATEUR
+   =========================== */
+.user-profile-section {
+    background: var(--glass-bg);
+    border-radius: var(--radius-xl);
+    padding: 1.25rem !important;
+}
+
+.user-avatar-btn {
+    position: relative;
+    background: var(--bg-tertiary);
+    border: 3px solid var(--primary);
+    border-radius: 50%;
+    width: 70px;
+    height: 70px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.user-avatar-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px var(--primary-glow);
+}
+
+.user-avatar-btn:hover .avatar-edit-icon {
+    opacity: 1;
+    transform: translate(50%, 50%) scale(1);
+}
+
+.user-avatar-large {
+    font-size: 2.5rem;
+    line-height: 1;
+}
+
+.avatar-edit-icon {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: var(--primary);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    opacity: 0.8;
+    transform: translate(50%, 50%) scale(0.9);
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
