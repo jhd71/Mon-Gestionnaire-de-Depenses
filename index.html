@@ -164,10 +164,41 @@
                 
                 <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Choisir un avatar :</label>
                 <div id="avatarPreview" style="text-align: center; margin-bottom: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 12px;">
-                    <span style="font-size: 3rem;">👤</span>
+                    <span id="avatarPreviewEmoji" style="font-size: 3rem;">👤</span>
                 </div>
+                
+                <!-- Grille d'avatars en dur dans le HTML -->
                 <div id="avatarGrid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 12px; max-height: 200px; overflow-y: auto;">
-                    <!-- Avatars générés par JavaScript -->
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👤')">👤</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👩')">👩</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👨')">👨</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👧')">👧</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👦')">👦</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🧑')">🧑</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👩‍🦰')">👩‍🦰</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👨‍🦰')">👨‍🦰</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👩‍🦱')">👩‍🦱</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👨‍🦱')">👨‍🦱</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👩‍🦳')">👩‍🦳</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👨‍🦳')">👨‍🦳</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🧔')">🧔</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👴')">👴</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👵')">👵</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🧒')">🧒</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('👶')">👶</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🐱')">🐱</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🐶')">🐶</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🦊')">🦊</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🐻')">🐻</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🐼')">🐼</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🦁')">🦁</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🐸')">🐸</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🌟')">🌟</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('💎')">💎</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🔥')">🔥</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('⚡')">⚡</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🌈')">🌈</button>
+                    <button type="button" class="avatar-btn" onclick="selectAvatar('🎯')">🎯</button>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1493,37 +1524,15 @@
         selectedAvatar = '👤';
         
         // Mettre à jour la prévisualisation
-        document.getElementById('avatarPreview').innerHTML = '<span style="font-size: 3rem;">👤</span>';
+        document.getElementById('avatarPreviewEmoji').textContent = '👤';
         
-        // Générer la grille d'avatars avec HTML complet
-        const grid = document.getElementById('avatarGrid');
-        
-        let buttonsHTML = '';
-        availableAvatars.forEach(avatar => {
-            const isSelected = avatar === selectedAvatar;
-            buttonsHTML += `
-                <button type="button" 
-                    onclick="selectAvatar('${avatar}')"
-                    style="
-                        width: 44px;
-                        height: 44px;
-                        font-size: 24px;
-                        border: ${isSelected ? '3px solid #8b5cf6' : '2px solid #374151'};
-                        background: ${isSelected ? 'rgba(139, 92, 246, 0.3)' : '#1f2937'};
-                        border-radius: 10px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        padding: 0;
-                        margin: 0;
-                        box-shadow: ${isSelected ? '0 0 12px rgba(139, 92, 246, 0.5)' : 'none'};
-                    "
-                >${avatar}</button>
-            `;
+        // Réinitialiser la sélection visuelle
+        document.querySelectorAll('#avatarGrid .avatar-btn').forEach(btn => {
+            btn.classList.remove('selected');
+            if (btn.textContent.trim() === '👤') {
+                btn.classList.add('selected');
+            }
         });
-        
-        grid.innerHTML = buttonsHTML;
         
         openModal('addTabModal');
     }
@@ -1532,19 +1541,14 @@
         selectedAvatar = avatar;
         
         // Mettre à jour la prévisualisation
-        document.getElementById('avatarPreview').innerHTML = '<span style="font-size: 3rem;">' + avatar + '</span>';
+        document.getElementById('avatarPreviewEmoji').textContent = avatar;
         
-        // Mettre à jour visuellement tous les boutons
-        const grid = document.getElementById('avatarGrid');
-        const buttons = grid.querySelectorAll('button');
-        
-        buttons.forEach(btn => {
-            const btnAvatar = btn.textContent.trim();
-            const isSelected = btnAvatar === avatar;
-            
-            btn.style.border = isSelected ? '3px solid #8b5cf6' : '2px solid #374151';
-            btn.style.background = isSelected ? 'rgba(139, 92, 246, 0.3)' : '#1f2937';
-            btn.style.boxShadow = isSelected ? '0 0 12px rgba(139, 92, 246, 0.5)' : 'none';
+        // Mettre à jour la sélection visuelle
+        document.querySelectorAll('#avatarGrid .avatar-btn').forEach(btn => {
+            btn.classList.remove('selected');
+            if (btn.textContent.trim() === avatar) {
+                btn.classList.add('selected');
+            }
         });
     }
 

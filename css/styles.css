@@ -1728,3 +1728,35 @@ body::before {
     transition: all var(--transition-fast);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
+
+/* ===========================
+   🎭 BOUTONS AVATAR (création utilisateur)
+   =========================== */
+.avatar-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 24px;
+    border: 2px solid #374151;
+    background: #1f2937;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    transition: all 0.2s ease;
+}
+
+.avatar-btn:hover {
+    transform: scale(1.1);
+    border-color: #8b5cf6;
+}
+
+.avatar-btn.selected {
+    border: 3px solid #8b5cf6 !important;
+    background: rgba(139, 92, 246, 0.3) !important;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.5);
+}
