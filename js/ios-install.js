@@ -243,7 +243,7 @@
         }
         
         .ios-prompt-header {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
             color: white;
             padding: 20px;
             display: flex;
@@ -319,7 +319,7 @@
         .ios-step-number {
             width: 28px;
             height: 28px;
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
             color: white;
             border-radius: 50%;
             display: flex;
@@ -341,7 +341,7 @@
         
         .ios-share-icon,
         .ios-home-icon {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
             color: white;
             width: 28px;
             height: 28px;
@@ -408,12 +408,12 @@
         .ios-btn-install {
             background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
         }
         
         .ios-btn-install:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
         }
         
         .ios-share-arrow {
@@ -432,12 +432,12 @@
         }
         
         .ios-arrow-content {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
             color: white;
             padding: 12px 20px;
             border-radius: 20px;
             text-align: center;
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
             font-size: 14px;
             font-weight: 600;
         }
