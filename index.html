@@ -1492,15 +1492,43 @@
         document.getElementById('newTabName').value = '';
         selectedAvatar = '👤'; // Réinitialiser l'avatar
         
-        // Générer la grille d'avatars
-        const grid = document.getElementById('avatarGrid');
-        grid.innerHTML = availableAvatars.map(avatar => `
-            <button type="button" class="avatar-option ${avatar === selectedAvatar ? 'selected' : ''}" 
-                    onclick="selectAvatar('${avatar}')">${avatar}</button>
-        `).join('');
-        
         // Mettre à jour la prévisualisation
         document.getElementById('avatarPreview').innerHTML = `<span style="font-size: 3rem;">${selectedAvatar}</span>`;
+        
+        // Générer la grille d'avatars avec styles inline pour garantir l'affichage
+        const grid = document.getElementById('avatarGrid');
+        grid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        `;
+        
+        grid.innerHTML = availableAvatars.map(avatar => `
+            <button type="button" 
+                    class="avatar-option ${avatar === selectedAvatar ? 'selected' : ''}" 
+                    onclick="selectAvatar('${avatar}')"
+                    style="
+                        width: 100%;
+                        min-width: 40px;
+                        min-height: 40px;
+                        aspect-ratio: 1;
+                        font-size: 1.5rem;
+                        border: 2px solid ${avatar === selectedAvatar ? 'var(--primary)' : 'transparent'};
+                        background: ${avatar === selectedAvatar ? 'rgba(139, 92, 246, 0.3)' : 'var(--bg-secondary)'};
+                        border-radius: 8px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 0;
+                        transition: all 0.2s ease;
+                    ">${avatar}</button>
+        `).join('');
         
         openModal('addTabModal');
     }
@@ -1511,12 +1539,12 @@
         // Mettre à jour la prévisualisation
         document.getElementById('avatarPreview').innerHTML = `<span style="font-size: 3rem;">${avatar}</span>`;
         
-        // Mettre à jour les classes de sélection
-        document.querySelectorAll('.avatar-option').forEach(btn => {
-            btn.classList.remove('selected');
-            if (btn.textContent === avatar) {
-                btn.classList.add('selected');
-            }
+        // Mettre à jour les styles de sélection sur tous les boutons
+        document.querySelectorAll('#avatarGrid .avatar-option').forEach(btn => {
+            const isSelected = btn.textContent.trim() === avatar;
+            btn.style.border = isSelected ? '2px solid var(--primary)' : '2px solid transparent';
+            btn.style.background = isSelected ? 'rgba(139, 92, 246, 0.3)' : 'var(--bg-secondary)';
+            btn.style.boxShadow = isSelected ? '0 0 15px rgba(139, 92, 246, 0.4)' : 'none';
         });
     }
 
