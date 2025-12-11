@@ -1834,3 +1834,56 @@ body::before {
 .calc-btn.equal:hover {
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
+
+/* ===========================
+   📋 MENUS DÉROULANTS (SELECT) - FIX MODE SOMBRE
+   =========================== */
+select.input,
+.input[type="select"],
+select {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+/* Style des options dans le menu déroulant */
+select.input option,
+select option {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 0.5rem;
+}
+
+/* Pour le mode sombre spécifiquement */
+[data-theme="dark"] select.input,
+[data-theme="dark"] select {
+    background-color: #1f2937;
+    color: #f8fafc;
+}
+
+[data-theme="dark"] select.input option,
+[data-theme="dark"] select option {
+    background-color: #1f2937;
+    color: #f8fafc;
+}
+
+/* Pour le mode clair */
+[data-theme="light"] select.input,
+[data-theme="light"] select {
+    background-color: #ffffff;
+    color: #1e293b;
+}
+
+[data-theme="light"] select.input option,
+[data-theme="light"] select option {
+    background-color: #ffffff;
+    color: #1e293b;
+}
+
+/* Hover sur les options */
+select option:hover,
+select option:focus,
+select option:checked {
+    background-color: var(--primary) !important;
+    color: white !important;
+}
