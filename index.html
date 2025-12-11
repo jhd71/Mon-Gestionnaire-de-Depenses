@@ -25,50 +25,6 @@
 	<link rel="icon" type="image/png" sizes="16x16" href="./images/icon-16.png">
 	<meta name="msapplication-TileColor" content="#2563eb">
 	<meta name="msapplication-TileImage" content="./images/icon-144.png">
-	<style>
-    /* Force l'application du style si le fichier CSS externe a un souci */
-    .avatar-grid {
-        display: grid !important;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 0.5rem;
-        padding: 0.75rem;
-        /* Utilisation d'une couleur de secours si la variable n'est pas chargée */
-        background: var(--bg-tertiary, #334155); 
-        border-radius: 12px;
-        max-height: 180px;
-        overflow-y: auto;
-        min-height: 100px; /* Force une hauteur minimale */
-    }
-
-    .avatar-option {
-        width: 100%;
-        aspect-ratio: 1;
-        font-size: 1.5rem;
-        border: 2px solid transparent;
-        /* Couleur de secours */
-        background: var(--bg-secondary, #1e293b); 
-        border-radius: 8px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white !important; /* Force la couleur du texte en blanc */
-    }
-
-    .avatar-option.selected {
-        border-color: #8b5cf6; /* Votre couleur violette */
-        background: rgba(139, 92, 246, 0.3);
-    }
-    
-    .avatar-preview {
-        text-align: center;
-        margin-bottom: 1rem;
-        padding: 1rem;
-        background: var(--bg-tertiary, #334155);
-        border-radius: 16px;
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-</style>
 </head>
 <body>
     <div class="header">
