@@ -1607,3 +1607,60 @@ body::before {
         width: 4px;
     }
 }
+
+/* ===========================
+   🎭 SÉLECTEUR D'AVATARS
+   =========================== */
+.avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-glass);
+    border-radius: var(--radius-lg);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.avatar-option {
+    width: 100%;
+    aspect-ratio: 1;
+    font-size: 1.5rem;
+    border: 2px solid transparent;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-option:hover {
+    background: var(--bg-glass-hover);
+    transform: scale(1.1);
+}
+
+.avatar-option.selected {
+    border-color: var(--primary);
+    background: rgba(139, 92, 246, 0.2);
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.avatar-preview {
+    padding: 1rem;
+    background: var(--bg-glass);
+    border-radius: var(--radius-xl);
+    border: var(--glass-border);
+}
+
+/* Responsive pour petits écrans */
+@media (max-width: 400px) {
+    .avatar-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+    
+    .avatar-option {
+        font-size: 1.25rem;
+    }
+}

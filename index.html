@@ -160,7 +160,15 @@
         <div class="modal-content">
             <div class="modal-header">Ajouter un utilisateur</div>
             <div class="modal-body">
-                <input type="text" class="input" id="newTabName" placeholder="Nom de l'utilisateur">
+                <input type="text" class="input" id="newTabName" placeholder="Nom de l'utilisateur" style="margin-bottom: 1rem;">
+                
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Choisir un avatar :</label>
+                <div class="avatar-preview" id="avatarPreview" style="text-align: center; margin-bottom: 1rem;">
+                    <span style="font-size: 3rem;">👤</span>
+                </div>
+                <div class="avatar-grid" id="avatarGrid">
+                    <!-- Les avatars seront générés par JavaScript -->
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-danger" onclick="closeModal('addTabModal')">Annuler</button>
@@ -609,6 +617,19 @@
     let calcExpression = '0';
     let confirmCallback = null;
     let actionCount = 0;
+	
+	// Liste des avatars disponibles
+    const availableAvatars = [
+        '👤', '👩', '👨', '👧', '👦', '🧑', 
+        '👩‍🦰', '👨‍🦰', '👩‍🦱', '👨‍🦱', '👩‍🦳', '👨‍🦳',
+        '🧔', '👴', '👵', '🧒', '👶', '🐱',
+        '🐶', '🦊', '🐻', '🐼', '🦁', '🐸',
+        '🌟', '💎', '🔥', '⚡', '🌈', '🎯'
+    ];
+    
+    // Avatar sélectionné pour nouvel utilisateur
+    let selectedAvatar = '👤';
+	
     let sessionStart = Date.now();
 
     // Fonction d'initialisation principale
@@ -1262,11 +1283,8 @@
         const balance = totalIncome - totalExpense - commonShare;
         const isPositive = balance >= 0;
         
-        // Générer l'initiale pour l'avatar
-        const initial = user.name.charAt(0).toUpperCase();
-        
-        // Emoji selon le type
-        const emoji = userId === 'commun' ? '👥' : '👤';
+        // Générer l'avatar (personnalisé ou par défaut)
+        const avatar = userId === 'commun' ? '👥' : (user.avatar || '👤');
         
         // Info dette : utiliser calculateBalance() pour cohérence avec la section Balance
         let transferInfo = '';
@@ -1286,7 +1304,7 @@
         card.className = 'user-card';
         card.innerHTML = `
             <div class="user-card-header">
-                <div class="user-avatar">${emoji}</div>
+                <div class="user-avatar">${avatar}</div>
                 <h3>${user.name}</h3>
             </div>
             <div class="user-card-body">
@@ -1437,7 +1455,34 @@
 
     function addNewTab() {
         document.getElementById('newTabName').value = '';
+        selectedAvatar = '👤'; // Réinitialiser l'avatar
+        
+        // Générer la grille d'avatars
+        const grid = document.getElementById('avatarGrid');
+        grid.innerHTML = availableAvatars.map(avatar => `
+            <button type="button" class="avatar-option ${avatar === selectedAvatar ? 'selected' : ''}" 
+                    onclick="selectAvatar('${avatar}')">${avatar}</button>
+        `).join('');
+        
+        // Mettre à jour la prévisualisation
+        document.getElementById('avatarPreview').innerHTML = `<span style="font-size: 3rem;">${selectedAvatar}</span>`;
+        
         openModal('addTabModal');
+    }
+    
+    function selectAvatar(avatar) {
+        selectedAvatar = avatar;
+        
+        // Mettre à jour la prévisualisation
+        document.getElementById('avatarPreview').innerHTML = `<span style="font-size: 3rem;">${avatar}</span>`;
+        
+        // Mettre à jour les classes de sélection
+        document.querySelectorAll('.avatar-option').forEach(btn => {
+            btn.classList.remove('selected');
+            if (btn.textContent === avatar) {
+                btn.classList.add('selected');
+            }
+        });
     }
 
     function confirmAddTab() {
@@ -1446,12 +1491,13 @@
             const userId = 'user_' + Date.now();
             appData.users[userId] = {
                 name: name,
+                avatar: selectedAvatar, // Sauvegarder l'avatar choisi
                 incomes: [],
                 expenses: []
             };
             saveData();
             closeModal('addTabModal');
-            renderApp(userId); // Aller directement sur le nouvel onglet
+            renderApp(userId);
         }
     }
 
@@ -1842,12 +1888,12 @@
         container.innerHTML = debts.map(debt => {
             const fromName = appData.users[debt.from]?.name || 'Inconnu';
             const toName = appData.users[debt.to]?.name || 'Inconnu';
-            const fromInitial = fromName.charAt(0).toUpperCase();
+            const fromAvatar = appData.users[debt.from]?.avatar || fromName.charAt(0).toUpperCase();
             
             return `
                 <div class="debt-card">
                     <div style="display: flex; align-items: center; gap: 1rem;">
-                        <div class="debt-avatar">${fromInitial}</div>
+                        <div class="debt-avatar">${fromAvatar}</div>
                         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                             <span style="font-weight: 700; color: var(--danger);">${fromName}</span>
                             <span style="font-size: 0.75rem; color: var(--text-secondary);">doit payer à</span>
