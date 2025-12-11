@@ -406,7 +406,7 @@
         }
         
         .ios-btn-install {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
             color: white;
             box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
         }
