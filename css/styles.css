@@ -140,37 +140,50 @@ body::before {
     -webkit-backdrop-filter: var(--glass-blur-strong);
     border-bottom: var(--glass-border);
     color: var(--text-primary);
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1rem;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.5rem;
     position: sticky;
     top: 0;
     z-index: 100;
     box-shadow: var(--shadow-inner);
 }
 
+.header-title {
+    width: 100%;
+    text-align: center;
+}
+
 .header h1 {
-    font-size: clamp(0.9rem, 4vw, 1.375rem);
+    font-size: 1.25rem;
     font-weight: 700;
     letter-spacing: -0.02em;
-    display: flex;
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
     background: var(--primary-gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-shrink: 1;
-    min-width: 0;
+    margin: 0;
+}
+
+.header-icon {
+    font-size: 1.5rem;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .header-buttons {
     display: flex;
+    justify-content: center;
     gap: 0.5rem;
+    width: 100%;
+    flex-wrap: wrap;
 }
 
 .btn-icon {
@@ -1400,15 +1413,20 @@ body::before {
    =========================== */
 @media (max-width: 768px) {
     .header {
-        padding: 0.875rem 1rem;
+        padding: 0.625rem 0.75rem;
+        gap: 0.375rem;
     }
     
     .header h1 {
         font-size: 1.125rem;
     }
     
+    .header-icon {
+        font-size: 1.375rem;
+    }
+    
     .header-buttons {
-        gap: 0.375rem;
+        gap: 0.25rem;
     }
     
     .btn-icon {
@@ -1485,7 +1503,16 @@ body::before {
     }
     
     .header h1 {
-        font-size: clamp(0.75rem, 3.5vw, 1rem);
+        font-size: 1rem;
+    }
+    
+    .header-icon {
+        font-size: 1.25rem;
+    }
+    
+    .header-buttons .btn-icon {
+        width: 38px;
+        height: 38px;
     }
     
     .tab {
