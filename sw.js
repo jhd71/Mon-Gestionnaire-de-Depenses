@@ -1,5 +1,5 @@
-// sw.js - Service Worker v7 - Version simplifiée et robuste
-const CACHE_VERSION = 'v7';
+// sw.js - Service Worker v8 - Version simplifiée et robuste
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `gestionnaire-depenses-${CACHE_VERSION}`;
 
 // Fichiers à mettre en cache

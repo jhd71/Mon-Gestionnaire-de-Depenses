@@ -603,111 +603,8 @@
         </div>
     </div>
 
+    <script src="js/boot.js"></script>
     <script>
-    // ============================================
-    // SYSTÈME DE BOOT ROBUSTE POUR PWA - V2
-    // ============================================
-    
-    // Flag global de boot - DOIT être au tout début
-    window.__APP_BOOTED__ = false;
-    window.__APP_BOOT_TIME__ = Date.now();
-    
-    // Fonction de boot principale - s'assure que l'app démarre TOUJOURS
-    function bootApp() {
-        // Éviter les boots multiples
-        if (window.__APP_BOOTED__) {
-            console.log('⚡ App déjà bootée, skip');
-            return;
-        }
-        
-        console.log('🚀 BOOT de l\'application...');
-        window.__APP_BOOTED__ = true;
-        
-        // Vérifier que le DOM est prêt
-        const checkDOM = () => {
-            const dashboard = document.getElementById('dashboard-content');
-            const tabs = document.getElementById('tabs');
-            
-            if (!dashboard || !tabs) {
-                console.log('⏳ DOM pas prêt, retry dans 50ms...');
-                setTimeout(checkDOM, 50);
-                return;
-            }
-            
-            console.log('✅ DOM prêt, initialisation...');
-            
-            // Lancer l'initialisation
-            if (typeof initializeApp === 'function') {
-                initializeApp();
-            } else {
-                console.error('❌ initializeApp non définie !');
-            }
-        };
-        
-        checkDOM();
-    }
-    
-    // BOOT IMMÉDIAT si le DOM est déjà prêt
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        // Petit délai pour s'assurer que tout le script est chargé
-        setTimeout(bootApp, 10);
-    }
-    
-    // BOOT sur DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(bootApp, 10);
-    });
-    
-    // BOOT sur load (backup)
-    window.addEventListener('load', () => {
-        setTimeout(bootApp, 100);
-    });
-    
-    // BOOT sur pageshow (restauration depuis cache PWA)
-    window.addEventListener('pageshow', (event) => {
-        console.log('📱 pageshow, persisted:', event.persisted);
-        if (event.persisted || !window.__APP_BOOTED__) {
-            // Reset le flag si la page vient du cache
-            window.__APP_BOOTED__ = false;
-            setTimeout(bootApp, 50);
-        }
-    });
-    
-    // BOOT sur visibilitychange (réveil de l'app)
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            console.log('📱 App visible');
-            // Vérifier si l'affichage est vide
-            const dashboard = document.getElementById('dashboard-content');
-            if (dashboard && dashboard.innerHTML.trim() === '') {
-                console.log('🔄 Affichage vide détecté, re-boot...');
-                window.__APP_BOOTED__ = false;
-                bootApp();
-            }
-        }
-    });
-    
-    // Vérification périodique pendant les 10 premières secondes
-    let bootCheckInterval = setInterval(() => {
-        const dashboard = document.getElementById('dashboard-content');
-        const timeSinceBoot = Date.now() - window.__APP_BOOT_TIME__;
-        
-        if (timeSinceBoot > 10000) {
-            clearInterval(bootCheckInterval);
-            return;
-        }
-        
-        if (dashboard && dashboard.innerHTML.trim() === '' && window.__APP_BOOTED__) {
-            console.log('🔄 Écran vide après boot, re-tentative...');
-            window.__APP_BOOTED__ = false;
-            bootApp();
-        }
-    }, 500);
-    
-    // ============================================
-    // FIN DU SYSTÈME DE BOOT
-    // ============================================
-    
     // État global de l'application
 	let currentTab = 'dashboard';
 	
@@ -791,85 +688,210 @@
     function initializeApp() {
         console.log('🚀 Initialisation de l\'application...');
         
-        try {
-            // Appliquer le thème sauvegardé
-            const preferredTheme = localStorage.getItem('preferredTheme') || 
-                                  document.body.getAttribute('data-theme') || 
-                                  'dark';
-            
-            document.body.setAttribute('data-theme', preferredTheme);
-            document.documentElement.setAttribute('data-theme', preferredTheme);
-            
-            // Charger les données
-            loadData();
-            
-            // Forcer la synchronisation du thème
-            if (appData.theme !== preferredTheme) {
-                appData.theme = preferredTheme;
-            }
-            
-            checkUrlImport();
-            
-            // Sécurité PIN (si disponible)
-            if (typeof initSecurity === 'function') {
-                initSecurity();
-            }
-            
-            syncTheme();
-            
-            // PWA (si disponible)
-            if (typeof initPWA === 'function') {
-                initPWA();
-            }
-            
-            // RENDU PRINCIPAL - C'est ici que l'interface s'affiche
-            renderApp();
-            console.log('✅ renderApp() exécuté');
-            
-            // Donation
-            if (typeof initDonation === 'function') {
-                initDonation();
-            }
-            
-            // Masquer le FAB au démarrage si on est sur le tableau de bord
-            const fabButton = document.getElementById('fabButton');
-            if (fabButton && appData.currentTab === 'dashboard') {
-                fabButton.style.display = 'none';
-            }
-            
-            // Surcharge de exportData pour le tracking
-            const originalExportData = window.exportData || (typeof exportData !== 'undefined' ? exportData : null);
-            if (originalExportData) {
-                window.exportData = function() {
-                    originalExportData();
-                    trackUserAction();
-                    
-                    if (!localStorage.getItem('exportDonationSuggested')) {
-                        setTimeout(() => {
-                            if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
-                                showDonationPopup();
-                            }
-                            localStorage.setItem('exportDonationSuggested', 'true');
-                        }, 500);
-                    }
-                };
-            }
-            
-            // Sauvegarde automatique
-            setInterval(saveData, 5000);
-            
-            console.log('✅ Application initialisée avec succès');
-            
-        } catch (error) {
-            console.error('❌ Erreur lors de l\'initialisation:', error);
-            // Afficher un message à l'utilisateur
-            setTimeout(() => {
-                const dashboard = document.getElementById('dashboard-content');
-                if (dashboard && dashboard.innerHTML.trim() === '') {
-                    dashboard.innerHTML = '<div style="text-align:center;padding:2rem;color:#888;">Erreur de chargement. Actualisez la page.</div>';
-                }
-            }, 1000);
+        // Appliquer le thème sauvegardé
+        const preferredTheme = localStorage.getItem('preferredTheme') || 
+                              document.body.getAttribute('data-theme') || 
+                              'dark';
+        
+        document.body.setAttribute('data-theme', preferredTheme);
+        document.documentElement.setAttribute('data-theme', preferredTheme);
+        
+        // Charger les données
+        loadData();
+        
+        // Forcer la synchronisation du thème
+        if (appData.theme !== preferredTheme) {
+            appData.theme = preferredTheme;
         }
+        
+        checkUrlImport();
+        initSecurity();
+        syncTheme();
+        initPWA();
+        
+        // RENDU PRINCIPAL
+        renderApp();
+        console.log('✅ renderApp() exécuté');
+        
+        initDonation();
+        
+        // Masquer le FAB au démarrage si on est sur le tableau de bord
+        const fabButton = document.getElementById('fabButton');
+        if (fabButton && appData.currentTab === 'dashboard') {
+            fabButton.style.display = 'none';
+        }
+        
+        // Surcharge de exportData pour le tracking
+        const originalExportData = window.exportData || exportData;
+        window.exportData = function() {
+            originalExportData();
+            trackUserAction();
+            
+            if (!localStorage.getItem('exportDonationSuggested')) {
+                setTimeout(() => {
+                    if (confirm('✅ Données exportées avec succès !\n\nCette application vous fait gagner du temps ?\nConsidérez un petit don pour nous aider à la maintenir gratuite ! 💖')) {
+                        showDonationPopup();
+                    }
+                    localStorage.setItem('exportDonationSuggested', 'true');
+                }, 500);
+            }
+        };
+        
+        // Sauvegarde automatique
+        setInterval(saveData, 5000);
+        
+        console.log('✅ Application initialisée avec succès');
+    }
+    
+    // 2. Sécurité supplémentaire avec window.onload
+    window.addEventListener('load', () => {
+        console.log('📄 window.load déclenché');
+        if (!appInitialized) {
+            safeInitializeApp();
+        } else {
+            // Vérifier si l'affichage est vide malgré l'initialisation
+            setTimeout(checkAndFixEmptyDisplay, 100);
+        }
+    });
+    
+    // 3. WATCHDOG PERMANENT - Vérifie toutes les 500ms pendant 5 secondes
+    let watchdogCount = 0;
+    const maxWatchdogChecks = 10;
+    
+    const watchdogInterval = setInterval(() => {
+        watchdogCount++;
+        
+        const dashboardContent = document.getElementById('dashboard-content');
+        const tabsContainer = document.getElementById('tabs');
+        const saved = localStorage.getItem('expenseTrackerData');
+        
+        // Vérifier si l'affichage est vide alors qu'il y a des données
+        const isDashboardEmpty = !dashboardContent || dashboardContent.innerHTML.trim() === '';
+        const areTabsIncomplete = !tabsContainer || tabsContainer.querySelectorAll('.tab').length < 2;
+        
+        if ((isDashboardEmpty || areTabsIncomplete) && saved) {
+            console.warn(`🔍 Watchdog #${watchdogCount}: Affichage incomplet détecté!`);
+            appInitialized = false; // Permettre une nouvelle initialisation
+            safeInitializeApp();
+        }
+        
+        // Arrêter le watchdog après le maximum de vérifications
+        if (watchdogCount >= maxWatchdogChecks) {
+            clearInterval(watchdogInterval);
+            console.log('✅ Watchdog terminé');
+        }
+    }, 500);
+
+// ========== NAVIGATION PAR SWIPE ==========
+    
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 80;
+    const maxVerticalDistance = 100;
+    
+    // Obtenir la liste ordonnée des onglets
+    function getTabsOrder() {
+        const tabs = ['dashboard'];
+        for (const userId in appData.users) {
+            if (userId !== 'commun') {
+                tabs.push(userId);
+            }
+        }
+        tabs.push('commun');
+        return tabs;
+    }
+    
+    // Naviguer vers l'onglet précédent
+    function goToPreviousTab() {
+        const tabs = getTabsOrder();
+        const currentIndex = tabs.indexOf(currentTab);
+        if (currentIndex > 0) {
+            const newTab = tabs[currentIndex - 1];
+            switchTab(newTab);
+            showSwipeIndicator('◀', 'left');
+        }
+    }
+    
+    // Naviguer vers l'onglet suivant
+    function goToNextTab() {
+        const tabs = getTabsOrder();
+        const currentIndex = tabs.indexOf(currentTab);
+        if (currentIndex < tabs.length - 1) {
+            const newTab = tabs[currentIndex + 1];
+            switchTab(newTab);
+            showSwipeIndicator('▶', 'right');
+        }
+    }
+    
+    // Afficher un indicateur de swipe
+    function showSwipeIndicator(symbol, direction) {
+        const existing = document.querySelector('.swipe-indicator');
+        if (existing) existing.remove();
+        
+        const indicator = document.createElement('div');
+        indicator.className = 'swipe-indicator';
+        indicator.textContent = symbol;
+        indicator.style.cssText = `
+            position: fixed;
+            top: 50%;
+            ${direction === 'left' ? 'left: 20px' : 'right: 20px'};
+            transform: translateY(-50%);
+            font-size: 2rem;
+            color: var(--primary);
+            background: var(--bg-secondary);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            animation: swipeFade 0.4s ease-out forwards;
+            pointer-events: none;
+        `;
+        document.body.appendChild(indicator);
+        setTimeout(() => indicator.remove(), 400);
+    }
+    
+    // Gestionnaires tactiles
+    function handleTouchStart(e) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }
+    
+    function handleTouchEnd(e) {
+        touchEndX = e.changedTouches[0].clientX;
+        touchEndY = e.changedTouches[0].clientY;
+        
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        
+        if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaY) < maxVerticalDistance) {
+            if (deltaX > 0) {
+                goToPreviousTab();
+            } else {
+                goToNextTab();
+            }
+        }
+    }
+    
+    // Initialiser le swipe après le chargement du DOM
+    function initSwipe() {
+        const contentArea = document.querySelector('.content');
+        if (contentArea) {
+            contentArea.addEventListener('touchstart', handleTouchStart, { passive: true });
+            contentArea.addEventListener('touchend', handleTouchEnd, { passive: true });
+        }
+    }
+    
+    // Appeler l'initialisation quand le DOM est prêt
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSwipe);
+    } else {
+        initSwipe();
     }
 	
     // Fonctions de gestion des données
@@ -917,12 +939,13 @@
         localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
     }
 
-// Fonction de vérification de l'affichage (version simplifiée)
+// Vérifier et corriger l'affichage vide (version simplifiée)
     function checkAndFixEmptyDisplay() {
+        // Cette fonction est maintenant gérée par boot.js
+        // Gardée pour compatibilité avec le code existant
         const dashboardContent = document.getElementById('dashboard-content');
-        
         if (dashboardContent && dashboardContent.innerHTML.trim() === '') {
-            console.log('🔄 Affichage vide détecté, rechargement des données...');
+            console.log('🔄 checkAndFixEmptyDisplay: re-rendu...');
             loadData();
             renderApp();
         }
