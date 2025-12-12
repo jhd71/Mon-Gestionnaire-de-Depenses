@@ -746,6 +746,43 @@
         
         console.log('✅ Application initialisée avec succès');
     }
+    
+    // ============================================
+    // SYSTÈME DE DÉMARRAGE ROBUSTE POUR PWA
+    // ============================================
+    
+    // Variable pour éviter les initialisations multiples
+    let appInitialized = false;
+    
+    // Fonction de démarrage sécurisée
+    function safeInitializeApp() {
+        if (appInitialized) {
+            console.log('⚠️ App déjà initialisée, skip...');
+            return;
+        }
+        
+        // Vérifier que le DOM est prêt
+        const dashboardContent = document.getElementById('dashboard-content');
+        const tabsContainer = document.getElementById('tabs');
+        
+        if (!dashboardContent || !tabsContainer) {
+            console.log('⏳ DOM pas encore prêt, nouvelle tentative dans 50ms...');
+            setTimeout(safeInitializeApp, 50);
+            return;
+        }
+        
+        console.log('🚀 Lancement de l\'initialisation...');
+        appInitialized = true;
+        initializeApp();
+    }
+    
+    // 1. DOMContentLoaded classique
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', safeInitializeApp);
+    } else {
+        // DOM déjà prêt
+        safeInitializeApp();
+    }
 
 // ========== NAVIGATION PAR SWIPE ==========
     
