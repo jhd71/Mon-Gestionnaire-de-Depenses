@@ -742,45 +742,6 @@
         
         console.log('✅ Application initialisée avec succès');
     }
-    
-    // 2. Sécurité supplémentaire avec window.onload
-    window.addEventListener('load', () => {
-        console.log('📄 window.load déclenché');
-        if (!appInitialized) {
-            safeInitializeApp();
-        } else {
-            // Vérifier si l'affichage est vide malgré l'initialisation
-            setTimeout(checkAndFixEmptyDisplay, 100);
-        }
-    });
-    
-    // 3. WATCHDOG PERMANENT - Vérifie toutes les 500ms pendant 5 secondes
-    let watchdogCount = 0;
-    const maxWatchdogChecks = 10;
-    
-    const watchdogInterval = setInterval(() => {
-        watchdogCount++;
-        
-        const dashboardContent = document.getElementById('dashboard-content');
-        const tabsContainer = document.getElementById('tabs');
-        const saved = localStorage.getItem('expenseTrackerData');
-        
-        // Vérifier si l'affichage est vide alors qu'il y a des données
-        const isDashboardEmpty = !dashboardContent || dashboardContent.innerHTML.trim() === '';
-        const areTabsIncomplete = !tabsContainer || tabsContainer.querySelectorAll('.tab').length < 2;
-        
-        if ((isDashboardEmpty || areTabsIncomplete) && saved) {
-            console.warn(`🔍 Watchdog #${watchdogCount}: Affichage incomplet détecté!`);
-            appInitialized = false; // Permettre une nouvelle initialisation
-            safeInitializeApp();
-        }
-        
-        // Arrêter le watchdog après le maximum de vérifications
-        if (watchdogCount >= maxWatchdogChecks) {
-            clearInterval(watchdogInterval);
-            console.log('✅ Watchdog terminé');
-        }
-    }, 500);
 
 // ========== NAVIGATION PAR SWIPE ==========
     
