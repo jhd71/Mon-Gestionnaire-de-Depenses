@@ -38,7 +38,7 @@
     --bg-primary: #0a0a0f;
     --bg-secondary: rgba(20, 20, 35, 0.8);
     --bg-tertiary: rgba(35, 35, 55, 0.6);
-    --bg-glass: rgba(255, 255, 255, 0.03);
+    /*--bg-glass: rgba(255, 255, 255, 0.03);*/
     --bg-glass-hover: rgba(255, 255, 255, 0.06);
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
@@ -47,7 +47,7 @@
     
     /* ✨ Effets Glass */
     --glass-blur: blur(20px);
-    --glass-blur-strong: blur(40px);
+   /* --glass-blur-strong: blur(40px);*/
     --glass-bg: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
     --glass-border: 1px solid rgba(255, 255, 255, 0.1);
     

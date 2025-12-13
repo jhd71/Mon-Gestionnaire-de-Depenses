@@ -2,15 +2,6 @@
 <html lang="fr">
 <head>
 <script>
-    // DIAGNOSTIC : Désenregistrer tous les Service Workers au chargement
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for(let registration of registrations) {
-                registration.unregister();
-                console.log('SW désenregistré:', registration.scope);
-            }
-        });
-    }
     // Appliquer le thème immédiatement pour éviter le flash
     (function() {
         const savedTheme = localStorage.getItem('preferredTheme') || 'dark';
@@ -611,6 +602,7 @@
             </div>
         </div>
     </div>
+
     <script>
     // État global de l'application
 	let currentTab = 'dashboard';
@@ -728,6 +720,11 @@
             fabButton.style.display = 'none';
         }
         
+        // Vérifications anti-bug multiples
+        setTimeout(checkAndFixEmptyDisplay, 300);
+        setTimeout(checkAndFixEmptyDisplay, 1000);
+        setTimeout(checkAndFixEmptyDisplay, 3000);
+        
         // Surcharge de exportData pour le tracking
         const originalExportData = window.exportData || exportData;
         window.exportData = function() {
@@ -749,6 +746,82 @@
         
         console.log('✅ Application initialisée avec succès');
     }
+    
+    // ============================================
+    // SYSTÈME DE DÉMARRAGE ROBUSTE POUR PWA
+    // ============================================
+    
+    // Variable pour éviter les initialisations multiples
+    let appInitialized = false;
+    
+    // Fonction de démarrage sécurisée
+    function safeInitializeApp() {
+        if (appInitialized) {
+            console.log('⚠️ App déjà initialisée, skip...');
+            return;
+        }
+        
+        // Vérifier que le DOM est prêt
+        const dashboardContent = document.getElementById('dashboard-content');
+        const tabsContainer = document.getElementById('tabs');
+        
+        if (!dashboardContent || !tabsContainer) {
+            console.log('⏳ DOM pas encore prêt, nouvelle tentative dans 50ms...');
+            setTimeout(safeInitializeApp, 50);
+            return;
+        }
+        
+        console.log('🚀 Lancement de l\'initialisation...');
+        appInitialized = true;
+        initializeApp();
+    }
+    
+    // 1. DOMContentLoaded classique
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', safeInitializeApp);
+    } else {
+        // DOM déjà prêt
+        safeInitializeApp();
+    }
+    
+    // 2. Sécurité supplémentaire avec window.onload
+    window.addEventListener('load', () => {
+        console.log('📄 window.load déclenché');
+        if (!appInitialized) {
+            safeInitializeApp();
+        } else {
+            // Vérifier si l'affichage est vide malgré l'initialisation
+            setTimeout(checkAndFixEmptyDisplay, 100);
+        }
+    });
+    
+    // 3. WATCHDOG PERMANENT - Vérifie toutes les 500ms pendant 5 secondes
+    let watchdogCount = 0;
+    const maxWatchdogChecks = 10;
+    
+    const watchdogInterval = setInterval(() => {
+        watchdogCount++;
+        
+        const dashboardContent = document.getElementById('dashboard-content');
+        const tabsContainer = document.getElementById('tabs');
+        const saved = localStorage.getItem('expenseTrackerData');
+        
+        // Vérifier si l'affichage est vide alors qu'il y a des données
+        const isDashboardEmpty = !dashboardContent || dashboardContent.innerHTML.trim() === '';
+        const areTabsIncomplete = !tabsContainer || tabsContainer.querySelectorAll('.tab').length < 2;
+        
+        if ((isDashboardEmpty || areTabsIncomplete) && saved) {
+            console.warn(`🔍 Watchdog #${watchdogCount}: Affichage incomplet détecté!`);
+            appInitialized = false; // Permettre une nouvelle initialisation
+            safeInitializeApp();
+        }
+        
+        // Arrêter le watchdog après le maximum de vérifications
+        if (watchdogCount >= maxWatchdogChecks) {
+            clearInterval(watchdogInterval);
+            console.log('✅ Watchdog terminé');
+        }
+    }, 500);
 
 // ========== NAVIGATION PAR SWIPE ==========
     
@@ -907,17 +980,109 @@
         localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
     }
 
-// Vérifier et corriger l'affichage vide (version simplifiée)
+// Vérifier et corriger l'affichage vide
     function checkAndFixEmptyDisplay() {
-        // Cette fonction est maintenant gérée par boot.js
-        // Gardée pour compatibilité avec le code existant
         const dashboardContent = document.getElementById('dashboard-content');
-        if (dashboardContent && dashboardContent.innerHTML.trim() === '') {
-            console.log('🔄 checkAndFixEmptyDisplay: re-rendu...');
-            loadData();
-            renderApp();
+        const tabsContainer = document.getElementById('tabs');
+        const saved = localStorage.getItem('expenseTrackerData');
+        
+        // Vérifier si l'affichage est vide
+        const isDashboardEmpty = !dashboardContent || dashboardContent.innerHTML.trim() === '';
+        const areTabsIncomplete = !tabsContainer || tabsContainer.querySelectorAll('.tab').length < 2;
+        
+        if ((isDashboardEmpty || areTabsIncomplete) && saved) {
+            console.warn('🔄 Affichage vide détecté !');
+            console.log('Dashboard vide:', isDashboardEmpty);
+            console.log('Onglets incomplets:', areTabsIncomplete);
+            
+            try {
+                const parsedData = JSON.parse(saved);
+                const userCount = Object.keys(parsedData.users || {}).length;
+                
+                console.log('Nombre d\'utilisateurs en mémoire:', userCount);
+                
+                if (userCount > 0) {
+                    console.log('🔄 Rechargement automatique des données...');
+                    loadData();
+                    renderApp();
+                    
+                    // Vérifier une dernière fois après un court délai
+                    setTimeout(() => {
+                        const newDashboard = document.getElementById('dashboard-content');
+                        const newTabs = document.getElementById('tabs');
+                        
+                        const stillEmpty = (!newDashboard || newDashboard.innerHTML.trim() === '') ||
+                                           (!newTabs || newTabs.querySelectorAll('.tab').length < 2);
+                        
+                        if (stillEmpty) {
+                            // Dernier recours : forcer un rechargement de la page
+                            const reloadCount = parseInt(sessionStorage.getItem('reloadCount') || '0');
+                            if (reloadCount < 2) {
+                                console.log('🔄 Forçage du rechargement de la page...');
+                                sessionStorage.setItem('reloadCount', String(reloadCount + 1));
+                                window.location.reload();
+                            } else {
+                                console.error('❌ Problème persistant après 2 rechargements');
+                                sessionStorage.removeItem('reloadCount');
+                                // Afficher un message à l'utilisateur
+                                alert('Une erreur est survenue. Veuillez fermer et rouvrir l\'application.');
+                            }
+                        } else {
+                            console.log('✅ Affichage restauré avec succès !');
+                            sessionStorage.removeItem('reloadCount');
+                        }
+                    }, 300);
+                }
+            } catch (e) {
+                console.error('Erreur vérification:', e);
+            }
+        } else if (!isDashboardEmpty && !areTabsIncomplete) {
+            // Tout va bien, nettoyer les flags
+            sessionStorage.removeItem('reloadCount');
         }
     }
+    
+    // Vérifier aussi quand l'app revient au premier plan (mobile)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            console.log('📱 App revenue au premier plan');
+            setTimeout(() => {
+                checkAndFixEmptyDisplay();
+            }, 200);
+        }
+    });
+    
+    // Vérifier quand la fenêtre reprend le focus
+    window.addEventListener('focus', () => {
+        setTimeout(() => {
+            checkAndFixEmptyDisplay();
+        }, 200);
+    });
+	
+	// Vérifier quand la page est restaurée depuis le cache (bouton retour, PWA)
+    window.addEventListener('pageshow', (event) => {
+        console.log('📱 pageshow déclenché, persisted:', event.persisted);
+        if (event.persisted) {
+            // La page a été restaurée depuis le cache
+            console.log('🔄 Page restaurée depuis le cache, vérification...');
+            setTimeout(() => {
+                checkAndFixEmptyDisplay();
+            }, 100);
+        }
+    });
+    
+    // Vérification au réveil après mise en veille
+    let lastActiveTime = Date.now();
+    setInterval(() => {
+        const now = Date.now();
+        // Si plus de 5 secondes se sont écoulées depuis la dernière vérification
+        // (indique que l'appareil était peut-être en veille)
+        if (now - lastActiveTime > 5000) {
+            console.log('📱 Appareil réveillé, vérification affichage...');
+            checkAndFixEmptyDisplay();
+        }
+        lastActiveTime = now;
+    }, 1000);
 	
     // Fonctions de donation
     function trackUserAction() {
@@ -3708,166 +3873,6 @@ function showSuccessMessage(message) {
         setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
-
-    // ========== EXPOSER LES FONCTIONS POUR BOOT.JS ==========
-    // CRITIQUE : Sans ceci, boot.js ne peut pas trouver les fonctions !
-    window.initializeApp = initializeApp;
-    window.loadData = loadData;
-    window.renderApp = renderApp;
-    window.checkAndFixEmptyDisplay = checkAndFixEmptyDisplay;
-    window.showSuccessMessage = showSuccessMessage;
-    window.showNotification = showNotification;
-    
-    // ========== INITIALISATION DIRECTE ULTRA-ROBUSTE ==========
-    (function() {
-        'use strict';
-        
-        console.log('📌 [INIT] Script principal chargé');
-        
-        // Cacher l'écran de chargement
-        function hideLoadingScreen() {
-            const loader = document.getElementById('loading-screen');
-            if (loader) {
-                loader.classList.add('hidden');
-                setTimeout(() => loader.remove(), 300);
-            }
-        }
-        
-        // Vérifier que les éléments critiques du DOM existent
-        function isDOMReady() {
-            return document.getElementById('dashboard-content') && 
-                   document.getElementById('tabs');
-        }
-        
-        // Fonction d'initialisation principale
-        function doInit() {
-            // Éviter double initialisation
-            if (window.__APP_INITIALIZED__) {
-                console.log('⚠️ [INIT] Déjà initialisé');
-                hideLoadingScreen();
-                return true;
-            }
-            
-            // Vérifier que le DOM est vraiment prêt
-            if (!isDOMReady()) {
-                console.log('⏳ [INIT] DOM pas encore prêt...');
-                return false;
-            }
-            
-            try {
-                console.log('🚀 [INIT] Lancement initializeApp()...');
-                initializeApp();
-                window.__APP_INITIALIZED__ = true;
-                console.log('✅ [INIT] Succès !');
-                
-                // Cacher l'écran de chargement
-                hideLoadingScreen();
-                
-                return true;
-            } catch(e) {
-                console.error('❌ [INIT] Erreur:', e);
-                // Même en cas d'erreur, cacher le loader après un moment
-                setTimeout(hideLoadingScreen, 2000);
-                return false;
-            }
-        }
-        
-        // Boucle d'initialisation agressive
-        function tryInit(attempt) {
-            attempt = attempt || 1;
-            const maxAttempts = 50; // 50 x 100ms = 5 secondes max
-            
-            if (attempt === 1 || attempt % 10 === 0) {
-                console.log(`🔄 [INIT] Tentative ${attempt}/${maxAttempts}`);
-            }
-            
-            if (doInit()) {
-                console.log('🎉 [INIT] Application prête !');
-                return;
-            }
-            
-            if (attempt < maxAttempts) {
-                setTimeout(() => tryInit(attempt + 1), 100);
-            } else {
-                console.error('💀 [INIT] Échec après 50 tentatives');
-                hideLoadingScreen();
-                // Afficher un message d'erreur
-                const dashboard = document.getElementById('dashboard-content');
-                if (dashboard) {
-                    dashboard.innerHTML = `
-                        <div style="text-align: center; padding: 2rem;">
-                            <div style="font-size: 3rem; margin-bottom: 1rem;">😕</div>
-                            <h3 style="margin-bottom: 1rem;">Erreur de chargement</h3>
-                            <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">
-                                L'application n'a pas pu démarrer correctement.
-                            </p>
-                            <button onclick="location.reload()" style="
-                                background: linear-gradient(135deg, #8b5cf6, #ec4899);
-                                color: white; border: none; padding: 12px 24px;
-                                border-radius: 12px; font-weight: 600; cursor: pointer;
-                            ">🔄 Actualiser</button>
-                        </div>
-                    `;
-                }
-            }
-        }
-        
-        // Démarrer l'initialisation
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            console.log('📍 [INIT] Document prêt, init immédiate');
-            setTimeout(tryInit, 0);
-        }
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('📍 [INIT] DOMContentLoaded');
-            if (!window.__APP_INITIALIZED__) {
-                setTimeout(tryInit, 0);
-            }
-        });
-        
-        window.addEventListener('load', () => {
-            console.log('📍 [INIT] Window load');
-            if (!window.__APP_INITIALIZED__) {
-                setTimeout(tryInit, 0);
-            }
-        });
-        
-        setTimeout(() => {
-            if (!window.__APP_INITIALIZED__) {
-                console.log('📍 [INIT] Backup 200ms');
-                tryInit();
-            }
-        }, 200);
-        
-        // Gestion du réveil
-        window.addEventListener('pageshow', (event) => {
-            setTimeout(() => {
-                const dashboard = document.getElementById('dashboard-content');
-                const isEmpty = !dashboard || dashboard.innerHTML.trim() === '';
-                if (isEmpty) {
-                    console.log('🔄 [PAGESHOW] Écran vide, re-init');
-                    window.__APP_INITIALIZED__ = false;
-                    tryInit();
-                }
-            }, 50);
-        });
-        
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                setTimeout(() => {
-                    const dashboard = document.getElementById('dashboard-content');
-                    const isEmpty = !dashboard || dashboard.innerHTML.trim() === '';
-                    if (isEmpty) {
-                        console.log('🔄 [VISIBILITY] Écran vide, re-init');
-                        window.__APP_INITIALIZED__ = false;
-                        tryInit();
-                    }
-                }, 100);
-            }
-        });
-        
-    })();
-    
 	</script>
 	<!-- Popup de donation -->
 	<div id="donationPopup" class="donation-overlay" style="display: none;">

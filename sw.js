@@ -1,98 +1,181 @@
-// sw.js - Service Worker v11 - Network First TOUJOURS
-const CACHE_VERSION = 'v11';
-const CACHE_NAME = `gestionnaire-depenses-${CACHE_VERSION}`;
-
-// Fichiers à mettre en cache
-const FILES_TO_CACHE = [
-    '/',
-    '/index.html',
-    '/css/styles.css',
-    '/js/pdf-export.js',
-    '/js/security.js',
-    '/js/ios-fixes.js',
-    '/js/ios-install.js',
-    '/manifest.json',
-    '/images/icon-192.png',
-    '/images/icon-512.png'
+// sw.js - Service Worker amélioré pour PWA complète
+const CACHE_NAME = 'gestionnaire-depenses-v5';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/css/styles.css',
+  '/js/pdf-export.js',
+  '/js/security.js',
+  '/js/ios-fixes.js',
+  '/js/ios-install.js',
+  '/manifest.json',
+  '/favicon.ico',
+  '/images/icon-192.png',
+  '/images/icon-512.png',
+  '/images/icon-192-maskable.png',
+  '/images/icon-512-maskable.png',
+  'https://fonts.googleapis.com/icon?family=Material+Icons'
 ];
 
-// Installation
+// Installation du Service Worker
 self.addEventListener('install', event => {
-    console.log('[SW v11] Installation...');
-    // Skip waiting immédiatement pour prendre le contrôle
-    self.skipWaiting();
+  console.log('🔧 Service Worker: Installation v5');
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('📦 Cache ouvert');
+        return cache.addAll(urlsToCache);
+      })
+      .then(() => {
+        console.log('✅ Tous les fichiers mis en cache');
+        return self.skipWaiting();
+      })
+      .catch(error => {
+        console.error('❌ Erreur lors de l\'installation:', error);
+      })
+  );
 });
 
-// Activation - Nettoyage des anciens caches
+// Activation et nettoyage des anciens caches
 self.addEventListener('activate', event => {
-    console.log('[SW v11] Activation...');
-    
-    event.waitUntil(
-        caches.keys()
-            .then(cacheNames => {
-                return Promise.all(
-                    cacheNames
-                        .filter(name => name !== CACHE_NAME)
-                        .map(name => {
-                            console.log('[SW v11] Suppression cache:', name);
-                            return caches.delete(name);
-                        })
-                );
-            })
-            .then(() => {
-                console.log('[SW v11] Prise de contrôle');
-                return self.clients.claim();
-            })
-    );
+  console.log('🚀 Service Worker: Activation');
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('🗑️ Suppression du cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => {
+      console.log('✅ Service Worker actif et en contrôle');
+      return self.clients.claim();
+    })
+  );
 });
 
-// Fetch - TOUJOURS Network First pour TOUT
+// Stratégie de cache améliorée
 self.addEventListener('fetch', event => {
-    const request = event.request;
-    const url = new URL(request.url);
-    
-    // Ignorer les requêtes non-GET
-    if (request.method !== 'GET') return;
-    
-    // Ignorer les requêtes vers d'autres domaines
-    if (url.origin !== self.location.origin) {
-        return;
-    }
-    
-    // STRATÉGIE : TOUJOURS réseau d'abord, cache en fallback uniquement
+  // Ignorer les requêtes non-HTTP/HTTPS
+  if (!event.request.url.startsWith('http')) {
+    return;
+  }
+  
+  const requestURL = new URL(event.request.url);
+  
+  // Ignorer les requêtes vers d'autres domaines sauf Google Fonts
+  const isGoogleFonts = requestURL.hostname === 'fonts.googleapis.com' || 
+                        requestURL.hostname === 'fonts.gstatic.com';
+  
+  if (requestURL.origin !== self.location.origin && !isGoogleFonts) {
+    return;
+  }
+  
+  // Déterminer si c'est une requête de navigation (page HTML)
+  const isNavigationRequest = event.request.mode === 'navigate' ||
+                              event.request.destination === 'document' ||
+                              requestURL.pathname === '/' ||
+                              requestURL.pathname.endsWith('.html');
+  
+  // Stratégie Network First pour les pages HTML (évite le cache obsolète)
+  if (isNavigationRequest) {
     event.respondWith(
-        fetch(request)
-            .then(response => {
-                // Succès réseau : mettre en cache et retourner
-                if (response && response.ok) {
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => {
-                        cache.put(request, responseClone);
-                    });
-                }
-                return response;
-            })
-            .catch(() => {
-                // Échec réseau (hors ligne) : utiliser le cache
-                console.log('[SW v11] Hors ligne, cache pour:', url.pathname);
-                return caches.match(request)
-                    .then(cachedResponse => {
-                        if (cachedResponse) {
-                            return cachedResponse;
-                        }
-                        // Dernier recours pour navigation
-                        if (request.mode === 'navigate') {
-                            return caches.match('/index.html');
-                        }
-                        return new Response('', { status: 404 });
-                    });
-            })
+      fetch(event.request)
+        .then(response => {
+          // Vérifier que la réponse est valide
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Hors ligne : utiliser le cache
+          console.log('📴 Hors ligne, utilisation du cache pour:', event.request.url);
+          return caches.match(event.request)
+            .then(response => response || caches.match('/index.html'));
+        })
     );
+    return;
+  }
+  
+  // Stratégie Cache First pour les assets (CSS, JS, images)
+  event.respondWith(
+    caches.match(event.request)
+      .then(cachedResponse => {
+        if (cachedResponse) {
+          // Mettre à jour le cache en arrière-plan (stale-while-revalidate)
+          fetch(event.request)
+            .then(response => {
+              if (response && response.status === 200 && event.request.method === 'GET') {
+                caches.open(CACHE_NAME).then(cache => {
+                  cache.put(event.request, response);
+                });
+              }
+            })
+            .catch(() => {}); // Ignorer les erreurs de mise à jour
+          
+          return cachedResponse;
+        }
+        
+        // Pas en cache, récupérer depuis le réseau
+        return fetch(event.request)
+          .then(response => {
+            if (!response || response.status !== 200 || event.request.method !== 'GET') {
+              return response;
+            }
+            
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+            
+            return response;
+          })
+          .catch(() => {
+            // Ressource non disponible
+            if (event.request.destination === 'image') {
+              // Retourner une image placeholder pour les images manquantes
+              return new Response(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="#1e293b" width="100" height="100"/><text fill="#64748b" x="50%" y="50%" text-anchor="middle" dy=".3em">📴</text></svg>',
+                { headers: { 'Content-Type': 'image/svg+xml' } }
+              );
+            }
+            
+            return new Response('Ressource non disponible hors ligne', {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain' }
+            });
+          });
+      })
+  );
 });
 
-// Messages
+// Gestion des messages pour mise à jour forcée
 self.addEventListener('message', event => {
-    if (event.data?.type === 'SKIP_WAITING') {
-        self.skipWaiting();
-    }
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('⏭️ Skip waiting demandé');
+    self.skipWaiting();
+  }
+  
+  // Nouveau : forcer le rechargement de tous les clients
+  if (event.data && event.data.type === 'REFRESH_ALL') {
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => client.navigate(client.url));
+    });
+  }
+});
+
+// Gestion des erreurs non capturées
+self.addEventListener('error', event => {
+  console.error('❌ Erreur Service Worker:', event.error);
+});
+
+self.addEventListener('unhandledrejection', event => {
+  console.error('❌ Promise rejetée:', event.reason);
 });
