@@ -1,4 +1,135 @@
+/* ===========================
+   🌟 LIQUID GLASS DESIGN
+   Design moderne avec effet verre dépoli
+   =========================== */
 
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* 🎨 Nouvelle palette de couleurs - Violet/Rose moderne */
+    --primary: #8b5cf6;
+    --primary-dark: #7c3aed;
+    --primary-light: #a78bfa;
+    --primary-gradient: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+    --primary-glow: rgba(139, 92, 246, 0.4);
+    
+    --accent: #06b6d4;
+    --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+    
+    --success: #10b981;
+    --success-light: #34d399;
+    --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --success-glow: rgba(16, 185, 129, 0.3);
+    
+    --danger: #f43f5e;
+    --danger-light: #fb7185;
+    --danger-gradient: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    --danger-glow: rgba(244, 63, 94, 0.3);
+    
+    --warning: #f59e0b;
+    --warning-light: #fbbf24;
+    --warning-gradient: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+    
+    /* 🌙 Mode sombre - Liquid Glass */
+    --bg-primary: #0a0a0f;
+    --bg-secondary: rgba(20, 20, 35, 0.8);
+    --bg-tertiary: rgba(35, 35, 55, 0.6);
+    /*--bg-glass: rgba(255, 255, 255, 0.03);*/
+    --bg-glass-hover: rgba(255, 255, 255, 0.06);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-glow: rgba(139, 92, 246, 0.3);
+    
+    /* ✨ Effets Glass */
+    --glass-blur: blur(20px);
+   /* --glass-blur-strong: blur(40px);*/
+    --glass-bg: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+    --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+    
+    /* 🌈 Ombres modernes */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 40px var(--primary-glow);
+    --shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    
+    /* ⏱️ Animations */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    
+    /* 📐 Espacement */
+    --radius-sm: 0.5rem;
+    --radius: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.5rem;
+    --radius-2xl: 2rem;
+    --radius-full: 9999px;
+}
+
+/* ☀️ Mode clair - Liquid Glass Light */
+[data-theme="light"] {
+    --bg-primary: #f0f4ff;
+    --bg-secondary: rgba(255, 255, 255, 0.7);
+    --bg-tertiary: rgba(255, 255, 255, 0.5);
+    --bg-glass: rgba(255, 255, 255, 0.6);
+    --bg-glass-hover: rgba(255, 255, 255, 0.8);
+    --text-primary: #1e1b4b;
+    --text-secondary: #64748b;
+    --border: rgba(139, 92, 246, 0.15);
+    --border-glow: rgba(139, 92, 246, 0.2);
+    --glass-bg: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%);
+    --glass-border: 1px solid rgba(139, 92, 246, 0.2);
+    --shadow: 0 8px 32px rgba(139, 92, 246, 0.15);
+    --shadow-lg: 0 16px 48px rgba(139, 92, 246, 0.2);
+}
+
+/* ===========================
+   🎭 BASE STYLES
+   =========================== */
+body {
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    transition: background var(--transition-base);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+}
+
+/* Fond avec dégradé subtil */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+[data-theme="light"] body::before {
+    background: 
+        radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.2) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
+}
 
 /* ===========================
    🎪 HEADER LIQUID GLASS
