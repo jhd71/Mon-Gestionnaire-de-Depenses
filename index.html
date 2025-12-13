@@ -3711,19 +3711,91 @@ function showSuccessMessage(message) {
     window.showSuccessMessage = showSuccessMessage;
     window.showNotification = showNotification;
     
-    // Auto-initialisation de secours si boot.js échoue
-    (function autoInit() {
-        setTimeout(() => {
-            if (!window.__BOOT__ || !window.__BOOT__.completed) {
-                console.log('⚡ Auto-initialisation de secours...');
-                try {
-                    initializeApp();
-                    console.log('✅ Auto-initialisation réussie');
-                } catch(e) {
-                    console.error('❌ Échec auto-init:', e);
+    // ========== INITIALISATION DIRECTE (SANS DÉPENDRE DE BOOT.JS) ==========
+    // Cette initialisation se fait IMMÉDIATEMENT à la fin du parsing du script
+    (function directInit() {
+        console.log('📌 Initialisation directe...');
+        
+        // Fonction d'init robuste
+        function doInit() {
+            try {
+                // Marquer comme initialisé pour éviter double init
+                if (window.__APP_INITIALIZED__) {
+                    console.log('⚠️ App déjà initialisée');
+                    return;
                 }
+                
+                console.log('🚀 Lancement initializeApp()...');
+                initializeApp();
+                window.__APP_INITIALIZED__ = true;
+                
+                // Marquer boot.js comme terminé aussi
+                if (window.__BOOT__) {
+                    window.__BOOT__.completed = true;
+                }
+                
+                console.log('✅ Initialisation directe réussie !');
+            } catch(e) {
+                console.error('❌ Erreur initialisation:', e);
             }
-        }, 1000);
+        }
+        
+        // Attendre que le DOM soit vraiment prêt
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', doInit);
+        } else {
+            // DOM déjà prêt - init immédiate
+            doInit();
+        }
+        
+        // Backup : si toujours pas initialisé après 500ms
+        setTimeout(() => {
+            if (!window.__APP_INITIALIZED__) {
+                console.log('⚠️ Backup init après 500ms...');
+                doInit();
+            }
+        }, 500);
+        
+        // Gestion du réveil de l'app (pageshow)
+        window.addEventListener('pageshow', (event) => {
+            console.log('📱 Pageshow, persisted:', event.persisted);
+            
+            setTimeout(() => {
+                const dashboard = document.getElementById('dashboard-content');
+                const isEmpty = !dashboard || dashboard.innerHTML.trim() === '';
+                
+                if (isEmpty) {
+                    console.log('🔄 Écran vide détecté, re-rendu...');
+                    try {
+                        loadData();
+                        renderApp();
+                    } catch(e) {
+                        console.error('Erreur re-rendu:', e);
+                        doInit();
+                    }
+                }
+            }, 100);
+        });
+        
+        // Gestion visibilitychange
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                setTimeout(() => {
+                    const dashboard = document.getElementById('dashboard-content');
+                    const isEmpty = !dashboard || dashboard.innerHTML.trim() === '';
+                    
+                    if (isEmpty && window.__APP_INITIALIZED__) {
+                        console.log('🔄 Réveil avec écran vide, re-rendu...');
+                        try {
+                            loadData();
+                            renderApp();
+                        } catch(e) {
+                            console.error('Erreur re-rendu:', e);
+                        }
+                    }
+                }, 200);
+            }
+        });
     })();
     
 	</script>

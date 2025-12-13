@@ -1,5 +1,5 @@
-// sw.js - Service Worker v8 - Version simplifiée et robuste
-const CACHE_VERSION = 'v8';
+// sw.js - Service Worker v9 - Version avec init directe
+const CACHE_VERSION = 'v9';
 const CACHE_NAME = `gestionnaire-depenses-${CACHE_VERSION}`;
 
 // Fichiers à mettre en cache
@@ -7,8 +7,11 @@ const FILES_TO_CACHE = [
     '/',
     '/index.html',
     '/css/styles.css',
+    '/js/boot.js',
     '/js/pdf-export.js',
     '/js/security.js',
+    '/js/ios-fixes.js',
+    '/js/ios-install.js',
     '/manifest.json',
     '/images/icon-192.png',
     '/images/icon-512.png'
@@ -16,23 +19,23 @@ const FILES_TO_CACHE = [
 
 // Installation - Mise en cache des fichiers essentiels
 self.addEventListener('install', event => {
-    console.log('[SW v7] Installation...');
+    console.log('[SW v9] Installation...');
     
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('[SW v7] Mise en cache des fichiers');
+                console.log('[SW v9] Mise en cache des fichiers');
                 // On ne bloque pas si certains fichiers échouent
                 return Promise.allSettled(
                     FILES_TO_CACHE.map(url => 
                         cache.add(url).catch(err => {
-                            console.warn('[SW v7] Échec cache:', url, err);
+                            console.warn('[SW v9] Échec cache:', url, err);
                         })
                     )
                 );
             })
             .then(() => {
-                console.log('[SW v7] Skip waiting');
+                console.log('[SW v9] Skip waiting');
                 return self.skipWaiting();
             })
     );
@@ -40,7 +43,7 @@ self.addEventListener('install', event => {
 
 // Activation - Nettoyage des anciens caches
 self.addEventListener('activate', event => {
-    console.log('[SW v7] Activation...');
+    console.log('[SW v9] Activation...');
     
     event.waitUntil(
         caches.keys()
@@ -49,13 +52,13 @@ self.addEventListener('activate', event => {
                     cacheNames
                         .filter(name => name !== CACHE_NAME)
                         .map(name => {
-                            console.log('[SW v7] Suppression ancien cache:', name);
+                            console.log('[SW v9] Suppression ancien cache:', name);
                             return caches.delete(name);
                         })
                 );
             })
             .then(() => {
-                console.log('[SW v7] Prise de contrôle des clients');
+                console.log('[SW v9] Prise de contrôle des clients');
                 return self.clients.claim();
             })
     );
@@ -98,7 +101,7 @@ self.addEventListener('fetch', event => {
                 })
                 .catch(() => {
                     // Hors ligne : utiliser le cache
-                    console.log('[SW v7] Hors ligne, utilisation du cache pour:', url.pathname);
+                    console.log('[SW v9] Hors ligne, utilisation du cache pour:', url.pathname);
                     return caches.match(request)
                         .then(cachedResponse => {
                             if (cachedResponse) {
@@ -159,12 +162,12 @@ self.addEventListener('message', event => {
     
     switch (type) {
         case 'SKIP_WAITING':
-            console.log('[SW v7] Skip waiting demandé');
+            console.log('[SW v9] Skip waiting demandé');
             self.skipWaiting();
             break;
             
         case 'CLEAR_CACHE':
-            console.log('[SW v7] Nettoyage du cache demandé');
+            console.log('[SW v9] Nettoyage du cache demandé');
             caches.keys().then(names => {
                 names.forEach(name => caches.delete(name));
             });
@@ -177,7 +180,7 @@ self.addEventListener('message', event => {
             break;
             
         case 'FORCE_REFRESH':
-            console.log('[SW v7] Force refresh demandé');
+            console.log('[SW v9] Force refresh demandé');
             // Notifier tous les clients de se recharger
             self.clients.matchAll().then(clients => {
                 clients.forEach(client => {
@@ -190,9 +193,9 @@ self.addEventListener('message', event => {
 
 // Gestion des erreurs
 self.addEventListener('error', event => {
-    console.error('[SW v7] Erreur:', event.error);
+    console.error('[SW v9] Erreur:', event.error);
 });
 
 self.addEventListener('unhandledrejection', event => {
-    console.error('[SW v7] Promise rejetée:', event.reason);
+    console.error('[SW v9] Promise rejetée:', event.reason);
 });
