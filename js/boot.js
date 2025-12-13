@@ -1,4 +1,4 @@
-// boot.js - Système de démarrage robuste pour PWA v2
+// boot.js - Système de démarrage robuste pour PWA v3
 // Ce fichier DOIT être chargé EN PREMIER dans la page
 
 (function() {
@@ -9,9 +9,8 @@
     // ============================================
     const CONFIG = {
         MAX_BOOT_ATTEMPTS: 5,
-        BOOT_CHECK_INTERVAL: 500,
-        BOOT_TIMEOUT: 10000,
-        DOM_CHECK_INTERVAL: 50,
+        INIT_CHECK_INTERVAL: 100,  // Vérifier toutes les 100ms
+        INIT_TIMEOUT: 5000,        // Timeout après 5 secondes
         DEBUG: true
     };
     
@@ -38,7 +37,7 @@
             'warning': '⚠️',
             'error': '❌',
             'boot': '🚀'
-        }[type] || '📝';
+        }[type] || '📌';
         
         console.log(`${prefix} [BOOT] ${message}`);
     }
@@ -49,21 +48,58 @@
     function isDOMReady() {
         const dashboard = document.getElementById('dashboard-content');
         const tabs = document.getElementById('tabs');
-        return dashboard && tabs;
+        return !!(dashboard && tabs);
     }
     
     function isDisplayEmpty() {
         const dashboard = document.getElementById('dashboard-content');
-        return !dashboard || dashboard.innerHTML.trim() === '' || 
-               dashboard.innerHTML.includes('empty-state') && 
-               localStorage.getItem('expenseTrackerData');
+        if (!dashboard) return true;
+        
+        const content = dashboard.innerHTML.trim();
+        // Vide ou seulement l'empty-state alors qu'il y a des données
+        const hasData = localStorage.getItem('expenseTrackerData');
+        const isEmpty = content === '' || 
+                       (content.includes('empty-state') && hasData && 
+                        JSON.parse(hasData).users && 
+                        Object.keys(JSON.parse(hasData).users).length > 1);
+        
+        return isEmpty;
+    }
+    
+    // ============================================
+    // ATTENDRE QUE initializeApp SOIT DISPONIBLE
+    // ============================================
+    function waitForInitFunction() {
+        return new Promise((resolve, reject) => {
+            let elapsed = 0;
+            
+            const check = () => {
+                // Vérifier si la fonction est disponible
+                if (typeof window.initializeApp === 'function') {
+                    log('initializeApp trouvée !', 'success');
+                    resolve();
+                    return;
+                }
+                
+                elapsed += CONFIG.INIT_CHECK_INTERVAL;
+                
+                if (elapsed >= CONFIG.INIT_TIMEOUT) {
+                    reject(new Error('initializeApp non trouvée après timeout'));
+                    return;
+                }
+                
+                setTimeout(check, CONFIG.INIT_CHECK_INTERVAL);
+            };
+            
+            check();
+        });
     }
     
     // ============================================
     // FONCTION DE BOOT PRINCIPALE
     // ============================================
-    function boot() {
-        // Éviter les boots multiples simultanés
+    async function boot() {
+        // Éviter les boots multiples
         if (window.__BOOT__.started && !window.__BOOT__.completed) {
             log('Boot déjà en cours...', 'warning');
             return;
@@ -81,88 +117,64 @@
         
         log(`Tentative de boot #${window.__BOOT__.attempts}...`, 'boot');
         
-        // Attendre que le DOM soit prêt
-        waitForDOM()
-            .then(() => {
-                log('DOM prêt', 'success');
-                return initializeApplication();
-            })
-            .then(() => {
-                window.__BOOT__.completed = true;
-                log('Boot terminé avec succès !', 'success');
-                sessionStorage.removeItem('reloadCount');
-            })
-            .catch(error => {
-                window.__BOOT__.errors.push(error);
-                log(`Erreur: ${error.message}`, 'error');
-                window.__BOOT__.started = false;
-                
-                // Réessayer après un délai
-                setTimeout(() => {
-                    if (!window.__BOOT__.completed) {
-                        boot();
-                    }
-                }, 500);
-            });
-    }
-    
-    // ============================================
-    // ATTENTE DU DOM
-    // ============================================
-    function waitForDOM() {
-        return new Promise((resolve, reject) => {
-            let attempts = 0;
-            const maxAttempts = 100; // 5 secondes max
-            
-            function check() {
-                attempts++;
-                
-                if (isDOMReady()) {
-                    resolve();
-                    return;
-                }
-                
-                if (attempts >= maxAttempts) {
-                    reject(new Error('DOM non disponible après timeout'));
-                    return;
-                }
-                
-                setTimeout(check, CONFIG.DOM_CHECK_INTERVAL);
-            }
-            
-            check();
-        });
-    }
-    
-    // ============================================
-    // INITIALISATION DE L'APPLICATION
-    // ============================================
-    function initializeApplication() {
-        return new Promise((resolve, reject) => {
-            try {
-                // Vérifier que initializeApp existe
-                if (typeof window.initializeApp !== 'function') {
-                    // La fonction n'existe pas encore, attendre
-                    let waitCount = 0;
-                    const waitForInit = setInterval(() => {
-                        waitCount++;
-                        if (typeof window.initializeApp === 'function') {
-                            clearInterval(waitForInit);
-                            window.initializeApp();
+        try {
+            // Attendre que le DOM soit prêt
+            if (!isDOMReady()) {
+                log('Attente du DOM...');
+                await new Promise(resolve => {
+                    const checkDOM = setInterval(() => {
+                        if (isDOMReady()) {
+                            clearInterval(checkDOM);
                             resolve();
-                        } else if (waitCount > 50) { // 2.5 secondes max
-                            clearInterval(waitForInit);
-                            reject(new Error('initializeApp non trouvée'));
                         }
                     }, 50);
-                } else {
-                    window.initializeApp();
-                    resolve();
-                }
-            } catch (error) {
-                reject(error);
+                    
+                    // Timeout après 3 secondes
+                    setTimeout(() => {
+                        clearInterval(checkDOM);
+                        resolve();
+                    }, 3000);
+                });
             }
-        });
+            
+            log('DOM prêt', 'success');
+            
+            // Attendre que initializeApp soit disponible
+            await waitForInitFunction();
+            
+            // Appeler initializeApp
+            log('Appel de initializeApp...');
+            window.initializeApp();
+            
+            // Vérifier que le rendu a fonctionné
+            setTimeout(() => {
+                if (isDisplayEmpty()) {
+                    log('Affichage vide détecté, re-rendu...', 'warning');
+                    if (typeof window.loadData === 'function') {
+                        window.loadData();
+                    }
+                    if (typeof window.renderApp === 'function') {
+                        window.renderApp();
+                    }
+                }
+            }, 500);
+            
+            window.__BOOT__.completed = true;
+            log('Boot terminé avec succès !', 'success');
+            sessionStorage.removeItem('reloadCount');
+            
+        } catch (error) {
+            window.__BOOT__.errors.push(error);
+            log(`Erreur: ${error.message}`, 'error');
+            window.__BOOT__.started = false;
+            
+            // Réessayer après un délai
+            setTimeout(() => {
+                if (!window.__BOOT__.completed) {
+                    boot();
+                }
+            }, 500);
+        }
     }
     
     // ============================================
@@ -198,37 +210,68 @@
     }
     
     // ============================================
-    // SURVEILLANCE CONTINUE
+    // RÉCUPÉRATION APRÈS MISE EN ARRIÈRE-PLAN
     // ============================================
-    function startMonitoring() {
-        // Vérification périodique pendant les premières secondes
-        const checkInterval = setInterval(() => {
-            const elapsed = Date.now() - window.__BOOT__.startTime;
+    function handleVisibilityChange() {
+        if (document.visibilityState === 'visible') {
+            log('App redevenue visible');
             
-            // Arrêter après le timeout
-            if (elapsed > CONFIG.BOOT_TIMEOUT) {
-                clearInterval(checkInterval);
-                return;
-            }
-            
-            // Vérifier si l'affichage est vide alors que le boot est "terminé"
-            if (window.__BOOT__.completed && isDisplayEmpty()) {
-                log('Affichage vide détecté après boot, re-rendu...', 'warning');
-                
-                // Tenter un re-rendu sans re-boot complet
-                if (typeof window.renderApp === 'function') {
+            setTimeout(() => {
+                if (isDisplayEmpty() && window.__BOOT__.completed) {
+                    log('Affichage vide après réveil, re-rendu...', 'warning');
+                    
                     try {
                         if (typeof window.loadData === 'function') {
                             window.loadData();
                         }
-                        window.renderApp();
-                        log('Re-rendu effectué', 'success');
+                        if (typeof window.renderApp === 'function') {
+                            window.renderApp();
+                            log('Re-rendu effectué', 'success');
+                        }
                     } catch (e) {
                         log('Erreur re-rendu: ' + e.message, 'error');
+                        // En cas d'échec critique, relancer le boot
+                        window.__BOOT__.started = false;
+                        window.__BOOT__.completed = false;
+                        window.__BOOT__.attempts = 0;
+                        boot();
                     }
                 }
-            }
-        }, CONFIG.BOOT_CHECK_INTERVAL);
+            }, 200);
+        }
+    }
+    
+    function handlePageShow(event) {
+        log(`Pageshow déclenché, persisted: ${event.persisted}`);
+        
+        if (event.persisted) {
+            // Page restaurée depuis le bfcache
+            log('Page restaurée depuis le cache', 'warning');
+            
+            setTimeout(() => {
+                if (isDisplayEmpty()) {
+                    log('Affichage vide après restauration, re-rendu...', 'warning');
+                    
+                    try {
+                        if (typeof window.loadData === 'function') {
+                            window.loadData();
+                        }
+                        if (typeof window.renderApp === 'function') {
+                            window.renderApp();
+                        }
+                    } catch (e) {
+                        // Forcer un reload si ça ne marche pas
+                        window.__BOOT__.started = false;
+                        window.__BOOT__.completed = false;
+                        window.__BOOT__.attempts = 0;
+                        boot();
+                    }
+                }
+            }, 100);
+        } else if (!window.__BOOT__.completed) {
+            // Nouveau chargement, lancer le boot
+            setTimeout(boot, 50);
+        }
     }
     
     // ============================================
@@ -243,7 +286,7 @@
         });
     } else {
         // DOM déjà prêt
-        log('DOM déjà prêt');
+        log('DOM déjà prêt au chargement de boot.js');
         setTimeout(boot, 10);
     }
     
@@ -253,66 +296,27 @@
         if (!window.__BOOT__.completed) {
             setTimeout(boot, 100);
         }
-        startMonitoring();
     });
     
     // Pageshow (restauration depuis cache PWA - CRUCIAL)
-    window.addEventListener('pageshow', (event) => {
-        log(`Pageshow déclenché, persisted: ${event.persisted}`);
-        
-        if (event.persisted) {
-            // Page restaurée depuis le bfcache
-            log('Page restaurée depuis le cache, vérification...', 'warning');
-            
-            // Reset le boot si nécessaire
-            if (isDisplayEmpty()) {
-                window.__BOOT__.started = false;
-                window.__BOOT__.completed = false;
-                window.__BOOT__.attempts = 0;
-                setTimeout(boot, 50);
-            }
-        } else if (!window.__BOOT__.completed) {
-            // Nouveau chargement, s'assurer que le boot est lancé
-            setTimeout(boot, 50);
-        }
-    });
+    window.addEventListener('pageshow', handlePageShow);
     
     // Visibilitychange (réveil de l'app)
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            log('App redevenue visible');
-            
-            // Vérifier l'affichage après un court délai
-            setTimeout(() => {
-                if (isDisplayEmpty() && window.__BOOT__.completed) {
-                    log('Affichage vide après réveil, re-rendu...', 'warning');
-                    
-                    if (typeof window.renderApp === 'function') {
-                        try {
-                            if (typeof window.loadData === 'function') {
-                                window.loadData();
-                            }
-                            window.renderApp();
-                        } catch (e) {
-                            // En cas d'échec, relancer le boot
-                            window.__BOOT__.started = false;
-                            window.__BOOT__.completed = false;
-                            boot();
-                        }
-                    }
-                }
-            }, 200);
-        }
-    });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     // Focus (backup)
     window.addEventListener('focus', () => {
         if (window.__BOOT__.completed && isDisplayEmpty()) {
             log('Focus avec affichage vide, re-rendu...', 'warning');
-            if (typeof window.renderApp === 'function') {
-                try {
+            try {
+                if (typeof window.loadData === 'function') {
+                    window.loadData();
+                }
+                if (typeof window.renderApp === 'function') {
                     window.renderApp();
-                } catch (e) {}
+                }
+            } catch (e) {
+                log('Erreur re-rendu sur focus: ' + e.message, 'error');
             }
         }
     });
@@ -327,6 +331,6 @@
         });
     }
     
-    log('Système de boot initialisé');
+    log('Système de boot v3 initialisé');
     
 })();

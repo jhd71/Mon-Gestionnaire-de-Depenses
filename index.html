@@ -3701,6 +3701,31 @@ function showSuccessMessage(message) {
         setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
+
+    // ========== EXPOSER LES FONCTIONS POUR BOOT.JS ==========
+    // CRITIQUE : Sans ceci, boot.js ne peut pas trouver les fonctions !
+    window.initializeApp = initializeApp;
+    window.loadData = loadData;
+    window.renderApp = renderApp;
+    window.checkAndFixEmptyDisplay = checkAndFixEmptyDisplay;
+    window.showSuccessMessage = showSuccessMessage;
+    window.showNotification = showNotification;
+    
+    // Auto-initialisation de secours si boot.js échoue
+    (function autoInit() {
+        setTimeout(() => {
+            if (!window.__BOOT__ || !window.__BOOT__.completed) {
+                console.log('⚡ Auto-initialisation de secours...');
+                try {
+                    initializeApp();
+                    console.log('✅ Auto-initialisation réussie');
+                } catch(e) {
+                    console.error('❌ Échec auto-init:', e);
+                }
+            }
+        }, 1000);
+    })();
+    
 	</script>
 	<!-- Popup de donation -->
 	<div id="donationPopup" class="donation-overlay" style="display: none;">
