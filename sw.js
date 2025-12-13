@@ -19,7 +19,7 @@ const urlsToCache = [
 
 // Installation du Service Worker
 self.addEventListener('install', event => {
-  console.log('🔧 Service Worker: Installation v5');
+  console.log('🔧 Service Worker: Installation v10');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
