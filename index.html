@@ -2,6 +2,15 @@
 <html lang="fr">
 <head>
 <script>
+    // DIAGNOSTIC : Désenregistrer tous les Service Workers au chargement
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+                registration.unregister();
+                console.log('SW désenregistré:', registration.scope);
+            }
+        });
+    }
     // Appliquer le thème immédiatement pour éviter le flash
     (function() {
         const savedTheme = localStorage.getItem('preferredTheme') || 'dark';
@@ -25,8 +34,83 @@
 	<link rel="icon" type="image/png" sizes="16x16" href="./images/icon-16.png">
 	<meta name="msapplication-TileColor" content="#2563eb">
 	<meta name="msapplication-TileImage" content="./images/icon-144.png">
+    
+    <!-- CSS CRITIQUE INLINE pour éviter l'écran blanc -->
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --primary: #8b5cf6;
+        }
+        [data-theme="light"] {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+        /* Écran de chargement */
+        #loading-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            transition: opacity 0.3s;
+        }
+        #loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .loading-spinner {
+            width: 50px; height: 50px;
+            border: 4px solid var(--bg-secondary);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Header minimal */
+        .header {
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+            padding: 1rem;
+            color: white;
+        }
+        .header h1 {
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+    </style>
 </head>
 <body>
+    <!-- Écran de chargement -->
+    <div id="loading-screen">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">💰</div>
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Chargement...</div>
+    </div>
+    
     <div class="header">
     <div class="header-title">
         <h1><span class="material-icons header-icon">savings</span> Gestionnaire de Dépenses</h1>
@@ -3717,6 +3801,15 @@ function showSuccessMessage(message) {
         
         console.log('📌 [INIT] Script principal chargé');
         
+        // Cacher l'écran de chargement
+        function hideLoadingScreen() {
+            const loader = document.getElementById('loading-screen');
+            if (loader) {
+                loader.classList.add('hidden');
+                setTimeout(() => loader.remove(), 300);
+            }
+        }
+        
         // Vérifier que les éléments critiques du DOM existent
         function isDOMReady() {
             return document.getElementById('dashboard-content') && 
@@ -3728,6 +3821,7 @@ function showSuccessMessage(message) {
             // Éviter double initialisation
             if (window.__APP_INITIALIZED__) {
                 console.log('⚠️ [INIT] Déjà initialisé');
+                hideLoadingScreen();
                 return true;
             }
             
@@ -3742,9 +3836,15 @@ function showSuccessMessage(message) {
                 initializeApp();
                 window.__APP_INITIALIZED__ = true;
                 console.log('✅ [INIT] Succès !');
+                
+                // Cacher l'écran de chargement
+                hideLoadingScreen();
+                
                 return true;
             } catch(e) {
                 console.error('❌ [INIT] Erreur:', e);
+                // Même en cas d'erreur, cacher le loader après un moment
+                setTimeout(hideLoadingScreen, 2000);
                 return false;
             }
         }
@@ -3754,7 +3854,9 @@ function showSuccessMessage(message) {
             attempt = attempt || 1;
             const maxAttempts = 50; // 50 x 100ms = 5 secondes max
             
-            console.log(`🔄 [INIT] Tentative ${attempt}/${maxAttempts}`);
+            if (attempt === 1 || attempt % 10 === 0) {
+                console.log(`🔄 [INIT] Tentative ${attempt}/${maxAttempts}`);
+            }
             
             if (doInit()) {
                 console.log('🎉 [INIT] Application prête !');
@@ -3765,39 +3867,48 @@ function showSuccessMessage(message) {
                 setTimeout(() => tryInit(attempt + 1), 100);
             } else {
                 console.error('💀 [INIT] Échec après 50 tentatives');
-                // Forcer un reload en dernier recours
-                if (!window.__RELOAD_ATTEMPTED__) {
-                    window.__RELOAD_ATTEMPTED__ = true;
-                    console.log('🔄 [INIT] Reload forcé...');
-                    location.reload();
+                hideLoadingScreen();
+                // Afficher un message d'erreur
+                const dashboard = document.getElementById('dashboard-content');
+                if (dashboard) {
+                    dashboard.innerHTML = `
+                        <div style="text-align: center; padding: 2rem;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">😕</div>
+                            <h3 style="margin-bottom: 1rem;">Erreur de chargement</h3>
+                            <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">
+                                L'application n'a pas pu démarrer correctement.
+                            </p>
+                            <button onclick="location.reload()" style="
+                                background: linear-gradient(135deg, #8b5cf6, #ec4899);
+                                color: white; border: none; padding: 12px 24px;
+                                border-radius: 12px; font-weight: 600; cursor: pointer;
+                            ">🔄 Actualiser</button>
+                        </div>
+                    `;
                 }
             }
         }
         
         // Démarrer l'initialisation
-        // Méthode 1: Immédiatement si le DOM est prêt
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            console.log('📍 [INIT] Document déjà chargé, init immédiate');
+            console.log('📍 [INIT] Document prêt, init immédiate');
             setTimeout(tryInit, 0);
         }
         
-        // Méthode 2: Sur DOMContentLoaded
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('📍 [INIT] DOMContentLoaded déclenché');
+            console.log('📍 [INIT] DOMContentLoaded');
             if (!window.__APP_INITIALIZED__) {
                 setTimeout(tryInit, 0);
             }
         });
         
-        // Méthode 3: Sur window.load (backup)
         window.addEventListener('load', () => {
-            console.log('📍 [INIT] Window load déclenché');
+            console.log('📍 [INIT] Window load');
             if (!window.__APP_INITIALIZED__) {
                 setTimeout(tryInit, 0);
             }
         });
         
-        // Méthode 4: Backup après 200ms
         setTimeout(() => {
             if (!window.__APP_INITIALIZED__) {
                 console.log('📍 [INIT] Backup 200ms');
@@ -3805,31 +3916,26 @@ function showSuccessMessage(message) {
             }
         }, 200);
         
-        // Gestion du réveil de l'app (pageshow)
+        // Gestion du réveil
         window.addEventListener('pageshow', (event) => {
-            console.log('📱 [PAGESHOW] persisted:', event.persisted);
-            
             setTimeout(() => {
                 const dashboard = document.getElementById('dashboard-content');
                 const isEmpty = !dashboard || dashboard.innerHTML.trim() === '';
-                
                 if (isEmpty) {
-                    console.log('🔄 [PAGESHOW] Écran vide, re-init...');
+                    console.log('🔄 [PAGESHOW] Écran vide, re-init');
                     window.__APP_INITIALIZED__ = false;
                     tryInit();
                 }
             }, 50);
         });
         
-        // Gestion visibilitychange
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 setTimeout(() => {
                     const dashboard = document.getElementById('dashboard-content');
                     const isEmpty = !dashboard || dashboard.innerHTML.trim() === '';
-                    
                     if (isEmpty) {
-                        console.log('🔄 [VISIBILITY] Écran vide, re-init...');
+                        console.log('🔄 [VISIBILITY] Écran vide, re-init');
                         window.__APP_INITIALIZED__ = false;
                         tryInit();
                     }

@@ -1,5 +1,5 @@
-// sw.js - Service Worker v10 - Sans boot.js externe
-const CACHE_VERSION = 'v10';
+// sw.js - Service Worker v11 - Network First TOUJOURS
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = `gestionnaire-depenses-${CACHE_VERSION}`;
 
 // Fichiers à mettre en cache
@@ -16,33 +16,16 @@ const FILES_TO_CACHE = [
     '/images/icon-512.png'
 ];
 
-// Installation - Mise en cache des fichiers essentiels
+// Installation
 self.addEventListener('install', event => {
-    console.log('[SW v10] Installation...');
-    
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('[SW v10] Mise en cache des fichiers');
-                // On ne bloque pas si certains fichiers échouent
-                return Promise.allSettled(
-                    FILES_TO_CACHE.map(url => 
-                        cache.add(url).catch(err => {
-                            console.warn('[SW v10] Échec cache:', url, err);
-                        })
-                    )
-                );
-            })
-            .then(() => {
-                console.log('[SW v10] Skip waiting');
-                return self.skipWaiting();
-            })
-    );
+    console.log('[SW v11] Installation...');
+    // Skip waiting immédiatement pour prendre le contrôle
+    self.skipWaiting();
 });
 
 // Activation - Nettoyage des anciens caches
 self.addEventListener('activate', event => {
-    console.log('[SW v10] Activation...');
+    console.log('[SW v11] Activation...');
     
     event.waitUntil(
         caches.keys()
@@ -51,19 +34,19 @@ self.addEventListener('activate', event => {
                     cacheNames
                         .filter(name => name !== CACHE_NAME)
                         .map(name => {
-                            console.log('[SW v10] Suppression ancien cache:', name);
+                            console.log('[SW v11] Suppression cache:', name);
                             return caches.delete(name);
                         })
                 );
             })
             .then(() => {
-                console.log('[SW v10] Prise de contrôle des clients');
+                console.log('[SW v11] Prise de contrôle');
                 return self.clients.claim();
             })
     );
 });
 
-// Fetch - Stratégie Network First pour HTML, Cache First pour assets
+// Fetch - TOUJOURS Network First pour TOUT
 self.addEventListener('fetch', event => {
     const request = event.request;
     const url = new URL(request.url);
@@ -71,130 +54,45 @@ self.addEventListener('fetch', event => {
     // Ignorer les requêtes non-GET
     if (request.method !== 'GET') return;
     
-    // Ignorer les requêtes vers d'autres domaines (sauf Google Fonts)
-    const isGoogleFonts = url.hostname.includes('googleapis.com') || 
-                          url.hostname.includes('gstatic.com');
-    
-    if (url.origin !== self.location.origin && !isGoogleFonts) {
+    // Ignorer les requêtes vers d'autres domaines
+    if (url.origin !== self.location.origin) {
         return;
     }
     
-    // Pour les pages HTML : TOUJOURS Network First
-    if (request.mode === 'navigate' || 
-        request.destination === 'document' ||
-        url.pathname.endsWith('.html') ||
-        url.pathname === '/' ||
-        url.pathname === '') {
-        
-        event.respondWith(
-            fetch(request)
-                .then(response => {
-                    // Mettre à jour le cache avec la nouvelle version
-                    if (response && response.ok) {
-                        const responseClone = response.clone();
-                        caches.open(CACHE_NAME).then(cache => {
-                            cache.put(request, responseClone);
-                        });
-                    }
-                    return response;
-                })
-                .catch(() => {
-                    // Hors ligne : utiliser le cache
-                    console.log('[SW v10] Hors ligne, utilisation du cache pour:', url.pathname);
-                    return caches.match(request)
-                        .then(cachedResponse => {
-                            if (cachedResponse) {
-                                return cachedResponse;
-                            }
-                            // Fallback sur index.html
-                            return caches.match('/index.html');
-                        });
-                })
-        );
-        return;
-    }
-    
-    // Pour les assets (CSS, JS, images) : Cache First
+    // STRATÉGIE : TOUJOURS réseau d'abord, cache en fallback uniquement
     event.respondWith(
-        caches.match(request)
-            .then(cachedResponse => {
-                if (cachedResponse) {
-                    // Mise à jour en arrière-plan
-                    fetch(request)
-                        .then(response => {
-                            if (response && response.ok) {
-                                caches.open(CACHE_NAME).then(cache => {
-                                    cache.put(request, response);
-                                });
-                            }
-                        })
-                        .catch(() => {});
-                    
-                    return cachedResponse;
+        fetch(request)
+            .then(response => {
+                // Succès réseau : mettre en cache et retourner
+                if (response && response.ok) {
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(request, responseClone);
+                    });
                 }
-                
-                // Pas en cache : télécharger
-                return fetch(request)
-                    .then(response => {
-                        if (response && response.ok) {
-                            const responseClone = response.clone();
-                            caches.open(CACHE_NAME).then(cache => {
-                                cache.put(request, responseClone);
-                            });
+                return response;
+            })
+            .catch(() => {
+                // Échec réseau (hors ligne) : utiliser le cache
+                console.log('[SW v11] Hors ligne, cache pour:', url.pathname);
+                return caches.match(request)
+                    .then(cachedResponse => {
+                        if (cachedResponse) {
+                            return cachedResponse;
                         }
-                        return response;
-                    })
-                    .catch(() => {
-                        // Asset manquant : retourner une réponse vide
-                        return new Response('', { 
-                            status: 404, 
-                            statusText: 'Not Found' 
-                        });
+                        // Dernier recours pour navigation
+                        if (request.mode === 'navigate') {
+                            return caches.match('/index.html');
+                        }
+                        return new Response('', { status: 404 });
                     });
             })
     );
 });
 
-// Gestion des messages
+// Messages
 self.addEventListener('message', event => {
-    const { type } = event.data || {};
-    
-    switch (type) {
-        case 'SKIP_WAITING':
-            console.log('[SW v10] Skip waiting demandé');
-            self.skipWaiting();
-            break;
-            
-        case 'CLEAR_CACHE':
-            console.log('[SW v10] Nettoyage du cache demandé');
-            caches.keys().then(names => {
-                names.forEach(name => caches.delete(name));
-            });
-            break;
-            
-        case 'GET_VERSION':
-            if (event.ports && event.ports[0]) {
-                event.ports[0].postMessage({ version: CACHE_VERSION });
-            }
-            break;
-            
-        case 'FORCE_REFRESH':
-            console.log('[SW v10] Force refresh demandé');
-            // Notifier tous les clients de se recharger
-            self.clients.matchAll().then(clients => {
-                clients.forEach(client => {
-                    client.postMessage({ type: 'REFRESH_PAGE' });
-                });
-            });
-            break;
+    if (event.data?.type === 'SKIP_WAITING') {
+        self.skipWaiting();
     }
-});
-
-// Gestion des erreurs
-self.addEventListener('error', event => {
-    console.error('[SW v10] Erreur:', event.error);
-});
-
-self.addEventListener('unhandledrejection', event => {
-    console.error('[SW v10] Promise rejetée:', event.reason);
 });
