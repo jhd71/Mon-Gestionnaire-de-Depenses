@@ -611,8 +611,6 @@
             </div>
         </div>
     </div>
-
-    <!-- boot.js désactivé - initialisation directe dans le script principal -->
     <script>
     // État global de l'application
 	let currentTab = 'dashboard';
@@ -3771,6 +3769,46 @@ function showSuccessMessage(message) {
                 // Même en cas d'erreur, cacher le loader après un moment
                 setTimeout(hideLoadingScreen, 2000);
                 return false;
+            }
+        }
+        
+        // Boucle d'initialisation agressive
+        function tryInit(attempt) {
+            attempt = attempt || 1;
+            const maxAttempts = 50; // 50 x 100ms = 5 secondes max
+            
+            if (attempt === 1 || attempt % 10 === 0) {
+                console.log(`🔄 [INIT] Tentative ${attempt}/${maxAttempts}`);
+            }
+            
+            if (doInit()) {
+                console.log('🎉 [INIT] Application prête !');
+                return;
+            }
+            
+            if (attempt < maxAttempts) {
+                setTimeout(() => tryInit(attempt + 1), 100);
+            } else {
+                console.error('💀 [INIT] Échec après 50 tentatives');
+                hideLoadingScreen();
+                // Afficher un message d'erreur
+                const dashboard = document.getElementById('dashboard-content');
+                if (dashboard) {
+                    dashboard.innerHTML = `
+                        <div style="text-align: center; padding: 2rem;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">😕</div>
+                            <h3 style="margin-bottom: 1rem;">Erreur de chargement</h3>
+                            <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">
+                                L'application n'a pas pu démarrer correctement.
+                            </p>
+                            <button onclick="location.reload()" style="
+                                background: linear-gradient(135deg, #8b5cf6, #ec4899);
+                                color: white; border: none; padding: 12px 24px;
+                                border-radius: 12px; font-weight: 600; cursor: pointer;
+                            ">🔄 Actualiser</button>
+                        </div>
+                    `;
+                }
             }
         }
         
