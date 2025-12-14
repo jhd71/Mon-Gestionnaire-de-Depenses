@@ -2,25 +2,22 @@
 <html lang="fr">
 <head>
 <script>
-    // Appliquer le thème immédiatement pour éviter le flash
+    // Appliquer le thème immédiatement
     (function() {
         const savedTheme = localStorage.getItem('preferredTheme') || 'dark';
         document.documentElement.setAttribute('data-theme', savedTheme);
     })();
     
     // ============================================
-    // WATCHDOG ANTI-FREEZE PWA v4 (cold start fix)
+    // WATCHDOG ANTI-FREEZE PWA v5 (cold start fix)
     // ============================================
     (function() {
         var TIMEOUT = 2000;
         var MAX_RELOADS = 2;
         var reloadCount = parseInt(sessionStorage.getItem('pwaReloadCount') || '0');
         
-        // IMMÉDIATEMENT cacher le contenu si on est en mode "réparation"
-        // ou si c'est potentiellement un cold start problématique
-        if (reloadCount > 0) {
-            document.documentElement.style.visibility = 'hidden';
-        }
+        // Marquer qu'on est en chargement
+        window.pwaLoading = true;
         
         var watchdogTimer = setTimeout(function() {
             if (typeof window.initializeApp !== 'function') {
@@ -29,21 +26,15 @@
                 if (reloadCount < MAX_RELOADS) {
                     console.warn('[PWA-FIX] Reload #' + (reloadCount + 1));
                     sessionStorage.setItem('pwaReloadCount', String(reloadCount + 1));
-                    // Cacher avant reload
-                    document.documentElement.style.visibility = 'hidden';
-                    showLoader();
-                    setTimeout(function() {
-                        window.location.reload(true);
-                    }, 50);
+                    window.location.reload(true);
                 } else {
                     console.error('[PWA-FIX] Échec après ' + MAX_RELOADS + ' reloads');
                     sessionStorage.removeItem('pwaReloadCount');
-                    document.documentElement.style.visibility = 'visible';
                     showError();
                 }
             } else {
                 sessionStorage.removeItem('pwaReloadCount');
-                document.documentElement.style.visibility = 'visible';
+                window.pwaLoading = false;
                 hideLoader();
             }
         }, TIMEOUT);
@@ -52,30 +43,30 @@
             clearTimeout(watchdogTimer);
         });
         
-        function showLoader() {
-            var el = document.getElementById('pwa-loader');
-            if (el) el.style.display = 'flex';
-        }
+        // Exposer pour que initializeApp puisse cacher le loader
+        window.hidePwaLoader = hideLoader;
         
         function hideLoader() {
-            var el = document.getElementById('pwa-loader');
-            if (el) el.style.display = 'none';
+            var loader = document.getElementById('pwa-loader');
+            var app = document.getElementById('pwa-app');
+            if (loader) loader.style.display = 'none';
+            if (app) app.style.visibility = 'visible';
         }
         
         function showError() {
-            var el = document.getElementById('pwa-loader');
-            if (el) {
-                el.innerHTML = '<div style="font-size:3rem;margin-bottom:1rem">⚠️</div><div style="color:white;font-size:1.1rem;margin-bottom:1.5rem">Problème de chargement</div><button onclick="sessionStorage.clear();caches.keys().then(function(n){n.forEach(function(c){caches.delete(c)})});setTimeout(function(){location.reload(true)},300)" style="background:#8b5cf6;color:white;border:none;padding:14px 28px;border-radius:10px;font-size:1rem;cursor:pointer">🔄 Vider le cache</button>';
-                el.style.display = 'flex';
+            var loader = document.getElementById('pwa-loader');
+            if (loader) {
+                loader.innerHTML = '<div style="font-size:3rem;margin-bottom:1rem">⚠️</div><div style="color:white;font-size:1.1rem;margin-bottom:1.5rem">Problème de chargement</div><button onclick="sessionStorage.clear();caches.keys().then(function(n){n.forEach(function(c){caches.delete(c)})});setTimeout(function(){location.reload(true)},300)" style="background:#8b5cf6;color:white;border:none;padding:14px 28px;border-radius:10px;font-size:1rem;cursor:pointer">🔄 Vider le cache</button>';
             }
         }
     })();
 </script>
 <style>
+    /* Loader toujours visible au démarrage */
     #pwa-loader {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
-        background: #1f2937;
+        background: var(--bg, #1f2937);
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -95,6 +86,10 @@
     @keyframes pulse {
         0%, 100% { transform: scale(1); opacity: 1; }
         50% { transform: scale(1.15); opacity: 0.8; }
+    }
+    /* App cachée par défaut */
+    #pwa-app {
+        visibility: hidden;
     }
 </style>
     <meta charset="UTF-8">
@@ -117,12 +112,15 @@
 	<meta name="msapplication-TileImage" content="./images/icon-144.png">
 </head>
 <body>
-    <!-- Écran de chargement PWA -->
+    <!-- Écran de chargement PWA (visible par défaut) -->
     <div id="pwa-loader">
         <div class="spinner">💰</div>
         <div class="text">Chargement...</div>
     </div>
 
+    <!-- App (cachée par défaut, visible quand JS prêt) -->
+    <div id="pwa-app">
+    
     <div class="header">
     <div class="header-title">
         <h1><span class="material-icons header-icon">savings</span> Gestionnaire de Dépenses</h1>
@@ -4030,6 +4028,8 @@ function showSuccessMessage(message) {
             </div>
         </div>
     </div>
+
+    </div><!-- Fin de #pwa-app -->
 	
 <!-- Scripts iOS -->
 <script src="js/ios-fixes.js"></script>
