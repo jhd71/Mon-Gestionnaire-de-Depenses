@@ -1,5 +1,5 @@
 /**
- * sw.js - Service Worker v11 - Simplifié et robuste
+ * sw.js - Service Worker v19 - Simplifié et robuste
  * 
  * Stratégie : Network First STRICT pour HTML, Cache First pour assets
  * Résout les problèmes d'écran vide au démarrage PWA
