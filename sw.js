@@ -5,7 +5,7 @@
  * Résout les problèmes d'écran vide au démarrage PWA
  */
 
-const CACHE_NAME = 'gestionnaire-depenses-v12';
+const CACHE_NAME = 'gestionnaire-depenses-v13';
 
 // Fichiers à mettre en cache
 const STATIC_ASSETS = [

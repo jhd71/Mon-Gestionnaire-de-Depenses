@@ -1,6 +1,6 @@
 /**
  * boot.js - Système de démarrage ultra-robuste pour PWA
- * Version 2.0 - Résout le problème d'écran vide au démarrage
+ * Version 3.0 - Détecte quand le JS inline n'est pas exécuté
  * 
  * Ce fichier DOIT être chargé en premier dans le <head> avec defer
  */
@@ -12,14 +12,24 @@
     // CONFIGURATION
     // ============================================
     const CONFIG = {
-        MAX_INIT_ATTEMPTS: 20,        // Nombre max de tentatives d'init
+        MAX_INIT_ATTEMPTS: 30,        // Nombre max de tentatives d'init
         INIT_RETRY_DELAY: 100,        // Délai entre tentatives (ms)
         WATCHDOG_INTERVAL: 500,       // Intervalle du watchdog (ms)
-        WATCHDOG_DURATION: 10000,     // Durée totale du watchdog (ms)
+        WATCHDOG_DURATION: 15000,     // Durée totale du watchdog (ms)
+        JS_CHECK_TIMEOUT: 3000,       // Temps max pour attendre le JS (ms)
         RENDER_CHECK_DELAY: 300,      // Délai avant vérification du rendu
         STORAGE_KEY: 'expenseTrackerData',
         DEBUG: true                   // Activer les logs de debug
     };
+    
+    // Fonctions critiques qui DOIVENT exister pour que l'app fonctionne
+    const CRITICAL_FUNCTIONS = [
+        'initializeApp',
+        'loadData',
+        'renderApp',
+        'switchTab',
+        'saveData'
+    ];
     
     // ============================================
     // ÉTAT DU SYSTÈME DE DÉMARRAGE
@@ -28,10 +38,12 @@
         initialized: false,
         initAttempts: 0,
         domReady: false,
+        jsLoaded: false,
         dataLoaded: false,
         renderComplete: false,
         watchdogActive: false,
-        startTime: Date.now()
+        startTime: Date.now(),
+        reloadTriggered: false
     };
     
     // ============================================
@@ -55,10 +67,32 @@
     }
     
     // ============================================
+    // VÉRIFICATION DU JAVASCRIPT CHARGÉ
+    // ============================================
+    function isJavaScriptLoaded() {
+        // Vérifier que toutes les fonctions critiques existent
+        for (const funcName of CRITICAL_FUNCTIONS) {
+            if (typeof window[funcName] !== 'function') {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    function getMissingFunctions() {
+        const missing = [];
+        for (const funcName of CRITICAL_FUNCTIONS) {
+            if (typeof window[funcName] !== 'function') {
+                missing.push(funcName);
+            }
+        }
+        return missing;
+    }
+    
+    // ============================================
     // VÉRIFICATION DU DOM
     // ============================================
     function isDOMReady() {
-        // Vérifier que les éléments critiques existent
         const criticalElements = [
             'dashboard-content',
             'tabs',
@@ -82,7 +116,6 @@
         const tabsContainer = document.getElementById('tabs');
         const hasData = localStorage.getItem(CONFIG.STORAGE_KEY);
         
-        // S'il n'y a pas de données, le rendu est "complet" par défaut
         if (!hasData) {
             return true;
         }
@@ -91,12 +124,10 @@
             const data = JSON.parse(hasData);
             const userCount = Object.keys(data.users || {}).length;
             
-            // Vérifier que le dashboard a du contenu
             const dashboardHasContent = dashboardContent && 
                                         dashboardContent.innerHTML.trim() !== '' &&
                                         dashboardContent.children.length > 0;
             
-            // Vérifier que les onglets sont présents (au minimum 2 : Dashboard + Balance)
             const tabsCount = tabsContainer ? tabsContainer.querySelectorAll('.tab').length : 0;
             const tabsAreComplete = tabsCount >= 2;
             
@@ -115,6 +146,86 @@
     }
     
     // ============================================
+    // FORCER LE RECHARGEMENT DE LA PAGE
+    // ============================================
+    function forcePageReload(reason) {
+        if (bootState.reloadTriggered) {
+            log('Reload déjà déclenché, ignoré');
+            return;
+        }
+        
+        const reloadCount = parseInt(sessionStorage.getItem('bootReloadCount') || '0');
+        
+        if (reloadCount >= 2) {
+            error('Trop de reloads, abandon. Raison:', reason);
+            sessionStorage.removeItem('bootReloadCount');
+            showCriticalError();
+            return;
+        }
+        
+        warn(`🔄 Reload forcé (#${reloadCount + 1}). Raison: ${reason}`);
+        bootState.reloadTriggered = true;
+        sessionStorage.setItem('bootReloadCount', String(reloadCount + 1));
+        
+        // Utiliser location.reload(true) pour bypass le cache
+        window.location.reload(true);
+    }
+    
+    // ============================================
+    // AFFICHER ERREUR CRITIQUE
+    // ============================================
+    function showCriticalError() {
+        document.body.innerHTML = `
+            <div style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                padding: 20px;
+                background: #1f2937;
+                color: white;
+                text-align: center;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            ">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
+                <h2 style="margin-bottom: 1rem;">Problème de chargement</h2>
+                <p style="color: #9ca3af; margin-bottom: 1.5rem; max-width: 300px;">
+                    L'application n'a pas pu démarrer correctement.
+                    Essayez de vider le cache de l'application.
+                </p>
+                <button onclick="
+                    sessionStorage.clear();
+                    caches.keys().then(names => names.forEach(name => caches.delete(name)));
+                    setTimeout(() => location.reload(true), 500);
+                " style="
+                    background: #8b5cf6;
+                    color: white;
+                    border: none;
+                    padding: 14px 28px;
+                    border-radius: 10px;
+                    font-size: 1rem;
+                    cursor: pointer;
+                    margin-bottom: 1rem;
+                ">
+                    🔄 Vider le cache et recharger
+                </button>
+                <button onclick="location.reload(true)" style="
+                    background: transparent;
+                    color: #9ca3af;
+                    border: 1px solid #4b5563;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                ">
+                    Recharger simplement
+                </button>
+            </div>
+        `;
+    }
+    
+    // ============================================
     // FONCTION D'INITIALISATION PRINCIPALE
     // ============================================
     function attemptInitialization() {
@@ -124,7 +235,7 @@
         // Vérifier le nombre max de tentatives
         if (bootState.initAttempts > CONFIG.MAX_INIT_ATTEMPTS) {
             error('Nombre max de tentatives atteint !');
-            handleInitializationFailure();
+            forcePageReload('Max tentatives atteint - JS probablement non chargé');
             return;
         }
         
@@ -136,14 +247,26 @@
         }
         
         bootState.domReady = true;
-        log('DOM prêt !');
         
-        // Vérifier si la fonction initializeApp existe
-        if (typeof window.initializeApp !== 'function') {
-            log('initializeApp pas encore disponible, nouvelle tentative...');
+        // Vérifier si le JavaScript est chargé
+        if (!isJavaScriptLoaded()) {
+            const missing = getMissingFunctions();
+            log('JS pas encore chargé. Fonctions manquantes:', missing.join(', '));
+            
+            // Vérifier si on a attendu trop longtemps
+            const elapsed = Date.now() - bootState.startTime;
+            if (elapsed > CONFIG.JS_CHECK_TIMEOUT) {
+                warn(`⚠️ JavaScript non chargé après ${elapsed}ms !`);
+                forcePageReload('JavaScript inline non exécuté après timeout');
+                return;
+            }
+            
             setTimeout(attemptInitialization, CONFIG.INIT_RETRY_DELAY);
             return;
         }
+        
+        bootState.jsLoaded = true;
+        log('✅ DOM prêt et JavaScript chargé !');
         
         // Éviter les initialisations multiples
         if (bootState.initialized) {
@@ -158,6 +281,9 @@
             bootState.initialized = true;
             window.initializeApp();
             log('✅ initializeApp() terminé');
+            
+            // Nettoyer le compteur de reload en cas de succès
+            sessionStorage.removeItem('bootReloadCount');
             
             // Vérifier le rendu après un délai
             verifyRenderAfterDelay();
@@ -180,6 +306,7 @@
             } else {
                 log('✅ Rendu vérifié et complet !');
                 bootState.renderComplete = true;
+                sessionStorage.removeItem('bootReloadCount');
                 stopWatchdog();
             }
         }, CONFIG.RENDER_CHECK_DELAY);
@@ -191,35 +318,28 @@
     function forceRerender() {
         log('🔄 Forçage du re-rendu...');
         
+        // D'abord vérifier que le JS est toujours chargé
+        if (!isJavaScriptLoaded()) {
+            warn('JS non disponible pour re-render !');
+            forcePageReload('JS disparu lors du re-render');
+            return;
+        }
+        
         try {
-            // Recharger les données
             if (typeof window.loadData === 'function') {
                 window.loadData();
                 log('Données rechargées');
             }
             
-            // Forcer le rendu
             if (typeof window.renderApp === 'function') {
                 window.renderApp();
                 log('renderApp() forcé');
             }
             
-            // Vérifier à nouveau
             setTimeout(() => {
                 if (!isRenderComplete()) {
                     warn('Rendu toujours incomplet après re-rendu forcé');
-                    
-                    // Dernier recours : rechargement de la page
-                    const reloadCount = parseInt(sessionStorage.getItem('bootReloadCount') || '0');
-                    if (reloadCount < 1) {
-                        log('Rechargement de la page...');
-                        sessionStorage.setItem('bootReloadCount', String(reloadCount + 1));
-                        window.location.reload();
-                    } else {
-                        error('Échec après rechargement - affichage du message d\'erreur');
-                        sessionStorage.removeItem('bootReloadCount');
-                        showErrorMessage();
-                    }
+                    forcePageReload('Re-render échoué');
                 } else {
                     log('✅ Re-rendu réussi !');
                     bootState.renderComplete = true;
@@ -229,6 +349,7 @@
             
         } catch (e) {
             error('Erreur lors du re-rendu forcé:', e);
+            forcePageReload('Exception lors du re-render');
         }
     }
     
@@ -248,21 +369,27 @@
         watchdogInterval = setInterval(() => {
             const elapsed = Date.now() - watchdogStart;
             
-            // Arrêter après la durée max
             if (elapsed > CONFIG.WATCHDOG_DURATION) {
                 log('Watchdog terminé (durée max atteinte)');
                 stopWatchdog();
                 return;
             }
             
-            // Arrêter si tout est OK
             if (bootState.renderComplete) {
                 log('Watchdog terminé (rendu complet)');
                 stopWatchdog();
                 return;
             }
             
-            // Vérifier l'état
+            // Vérifier si le JS est toujours chargé
+            if (!isJavaScriptLoaded() && elapsed > CONFIG.JS_CHECK_TIMEOUT) {
+                warn(`Watchdog: JS non chargé à +${elapsed}ms`);
+                forcePageReload('Watchdog: JS non détecté');
+                stopWatchdog();
+                return;
+            }
+            
+            // Vérifier l'état du rendu
             if (bootState.initialized && !isRenderComplete()) {
                 warn(`Watchdog: rendu incomplet détecté à +${elapsed}ms`);
                 forceRerender();
@@ -280,56 +407,22 @@
     }
     
     // ============================================
-    // GESTION DES ERREURS
-    // ============================================
-    function handleInitializationFailure() {
-        error('Échec de l\'initialisation après toutes les tentatives');
-        showErrorMessage();
-    }
-    
-    function showErrorMessage() {
-        const container = document.getElementById('dashboard-content');
-        if (container) {
-            container.innerHTML = `
-                <div style="
-                    text-align: center;
-                    padding: 40px 20px;
-                    color: var(--text-secondary, #888);
-                ">
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
-                    <h3 style="margin-bottom: 1rem; color: var(--text, #fff);">
-                        Problème de chargement
-                    </h3>
-                    <p style="margin-bottom: 1.5rem;">
-                        L'application n'a pas pu se charger correctement.
-                    </p>
-                    <button onclick="location.reload()" style="
-                        background: var(--primary, #8b5cf6);
-                        color: white;
-                        border: none;
-                        padding: 12px 24px;
-                        border-radius: 8px;
-                        font-size: 1rem;
-                        cursor: pointer;
-                    ">
-                        🔄 Recharger l'application
-                    </button>
-                </div>
-            `;
-        }
-    }
-    
-    // ============================================
     // GESTION DU CYCLE DE VIE PWA
     // ============================================
     
-    // Gestion du pageshow (retour depuis bfcache)
     window.addEventListener('pageshow', function(event) {
         log('📄 pageshow déclenché, persisted:', event.persisted);
         
         if (event.persisted) {
-            // La page vient du bfcache - forcer une vérification
             log('Page restaurée depuis bfcache');
+            
+            // Vérifier immédiatement si le JS est chargé
+            if (!isJavaScriptLoaded()) {
+                warn('JS non disponible après restauration bfcache !');
+                forcePageReload('bfcache: JS non disponible');
+                return;
+            }
+            
             setTimeout(() => {
                 if (!isRenderComplete()) {
                     forceRerender();
@@ -338,12 +431,17 @@
         }
     });
     
-    // Gestion du visibilitychange (retour au premier plan)
     document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'visible') {
             log('📱 Application revenue au premier plan');
             
-            // Petit délai pour laisser le temps au système
+            // Vérifier si le JS est toujours là
+            if (!isJavaScriptLoaded()) {
+                warn('JS non disponible au retour au premier plan !');
+                forcePageReload('visibilitychange: JS non disponible');
+                return;
+            }
+            
             setTimeout(() => {
                 if (bootState.initialized && !isRenderComplete()) {
                     warn('Affichage vide détecté au retour');
@@ -353,9 +451,14 @@
         }
     });
     
-    // Gestion du focus
     window.addEventListener('focus', function() {
         log('🎯 Focus reçu');
+        
+        if (!isJavaScriptLoaded()) {
+            warn('JS non disponible au focus !');
+            forcePageReload('focus: JS non disponible');
+            return;
+        }
         
         if (bootState.initialized && !bootState.renderComplete) {
             setTimeout(() => {
@@ -370,20 +473,22 @@
     // DÉMARRAGE DU SYSTÈME
     // ============================================
     function startBoot() {
-        log('🏁 Démarrage du système de boot v2.0');
+        log('🏁 Démarrage du système de boot v3.0');
         
-        // Démarrer le watchdog
+        // Vérifier si on a déjà essayé trop de fois
+        const reloadCount = parseInt(sessionStorage.getItem('bootReloadCount') || '0');
+        if (reloadCount > 0) {
+            log(`⚠️ Tentative de boot #${reloadCount + 1} après reload`);
+        }
+        
         startWatchdog();
         
-        // Lancer l'initialisation
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', attemptInitialization);
         } else {
-            // DOM déjà prêt
             attemptInitialization();
         }
         
-        // Sécurité supplémentaire avec window.onload
         window.addEventListener('load', function() {
             log('📄 window.load déclenché');
             
@@ -395,12 +500,15 @@
         });
     }
     
-    // Exposer certaines fonctions pour debug
+    // Exposer pour debug
     window.bootSystem = {
         state: bootState,
         config: CONFIG,
         forceRerender: forceRerender,
-        checkRender: isRenderComplete
+        forceReload: () => forcePageReload('Manuel'),
+        checkRender: isRenderComplete,
+        checkJS: isJavaScriptLoaded,
+        getMissing: getMissingFunctions
     };
     
     // Démarrer !
