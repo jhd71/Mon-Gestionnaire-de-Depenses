@@ -8,6 +8,42 @@
         document.documentElement.setAttribute('data-theme', savedTheme);
         document.body?.setAttribute('data-theme', savedTheme);
     })();
+    
+    // ============================================
+    // WATCHDOG ANTI-FREEZE PWA (cold start fix)
+    // ============================================
+    (function() {
+        var TIMEOUT = 4000; // 4 secondes max pour charger le JS
+        var MAX_RELOADS = 2;
+        
+        // Compter les reloads pour éviter boucle infinie
+        var reloadCount = parseInt(sessionStorage.getItem('pwaReloadCount') || '0');
+        
+        // Timer qui vérifie si le JS principal est chargé
+        var watchdogTimer = setTimeout(function() {
+            // Vérifier si initializeApp existe (preuve que le JS est chargé)
+            if (typeof window.initializeApp !== 'function') {
+                console.warn('[PWA-FIX] JS non chargé après ' + TIMEOUT + 'ms !');
+                
+                if (reloadCount < MAX_RELOADS) {
+                    console.warn('[PWA-FIX] Reload #' + (reloadCount + 1));
+                    sessionStorage.setItem('pwaReloadCount', String(reloadCount + 1));
+                    window.location.reload(true);
+                } else {
+                    console.error('[PWA-FIX] Échec après ' + MAX_RELOADS + ' reloads');
+                    sessionStorage.removeItem('pwaReloadCount');
+                }
+            } else {
+                // JS chargé, nettoyer le compteur
+                sessionStorage.removeItem('pwaReloadCount');
+            }
+        }, TIMEOUT);
+        
+        // Annuler le timer si la page se décharge normalement
+        window.addEventListener('beforeunload', function() {
+            clearTimeout(watchdogTimer);
+        });
+    })();
 </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
