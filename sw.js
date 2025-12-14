@@ -53,7 +53,6 @@ self.addEventListener('install', event => {
 // ACTIVATION
 // ============================================
 self.addEventListener('activate', event => {
-    console.log('🚀 SW v11: Activation');
     
     event.waitUntil(
         caches.keys()
