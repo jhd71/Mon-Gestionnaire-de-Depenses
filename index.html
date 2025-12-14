@@ -839,6 +839,11 @@
         setInterval(saveData, 5000);
         
         console.log('✅ Application initialisée avec succès');
+        
+        // Cacher l'écran de chargement PWA
+        if (typeof window.hidePwaLoader === 'function') {
+            window.hidePwaLoader();
+        }
     }
     
     // ============================================
