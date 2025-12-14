@@ -1,5 +1,5 @@
 /**
- * sw.js - Service Worker v19 - Simplifié et robuste
+ * sw.js
  * 
  * Stratégie : Network First STRICT pour HTML, Cache First pour assets
  * Résout les problèmes d'écran vide au démarrage PWA
@@ -28,7 +28,6 @@ const STATIC_ASSETS = [
 // INSTALLATION
 // ============================================
 self.addEventListener('install', event => {
-    console.log('🔧 SW v11: Installation');
     
     event.waitUntil(
         caches.open(CACHE_NAME)
