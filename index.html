@@ -15,6 +15,8 @@
     <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="css/styles.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	<!-- Système de démarrage robuste - DOIT être chargé en premier -->
+    <script src="js/boot.js" defer></script>
     <meta name="theme-color" content="#221e33">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -748,80 +750,9 @@
     }
     
     // ============================================
-    // SYSTÈME DE DÉMARRAGE ROBUSTE POUR PWA
+    // DÉMARRAGE GÉRÉ PAR boot.js
     // ============================================
-    
-    // Variable pour éviter les initialisations multiples
-    let appInitialized = false;
-    
-    // Fonction de démarrage sécurisée
-    function safeInitializeApp() {
-        if (appInitialized) {
-            console.log('⚠️ App déjà initialisée, skip...');
-            return;
-        }
-        
-        // Vérifier que le DOM est prêt
-        const dashboardContent = document.getElementById('dashboard-content');
-        const tabsContainer = document.getElementById('tabs');
-        
-        if (!dashboardContent || !tabsContainer) {
-            console.log('⏳ DOM pas encore prêt, nouvelle tentative dans 50ms...');
-            setTimeout(safeInitializeApp, 50);
-            return;
-        }
-        
-        console.log('🚀 Lancement de l\'initialisation...');
-        appInitialized = true;
-        initializeApp();
-    }
-    
-    // 1. DOMContentLoaded classique
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', safeInitializeApp);
-    } else {
-        // DOM déjà prêt
-        safeInitializeApp();
-    }
-    
-    // 2. Sécurité supplémentaire avec window.onload
-    window.addEventListener('load', () => {
-        console.log('📄 window.load déclenché');
-        if (!appInitialized) {
-            safeInitializeApp();
-        } else {
-            // Vérifier si l'affichage est vide malgré l'initialisation
-            setTimeout(checkAndFixEmptyDisplay, 100);
-        }
-    });
-    
-    // 3. WATCHDOG PERMANENT - Vérifie toutes les 500ms pendant 5 secondes
-    let watchdogCount = 0;
-    const maxWatchdogChecks = 10;
-    
-    const watchdogInterval = setInterval(() => {
-        watchdogCount++;
-        
-        const dashboardContent = document.getElementById('dashboard-content');
-        const tabsContainer = document.getElementById('tabs');
-        const saved = localStorage.getItem('expenseTrackerData');
-        
-        // Vérifier si l'affichage est vide alors qu'il y a des données
-        const isDashboardEmpty = !dashboardContent || dashboardContent.innerHTML.trim() === '';
-        const areTabsIncomplete = !tabsContainer || tabsContainer.querySelectorAll('.tab').length < 2;
-        
-        if ((isDashboardEmpty || areTabsIncomplete) && saved) {
-            console.warn(`🔍 Watchdog #${watchdogCount}: Affichage incomplet détecté!`);
-            appInitialized = false; // Permettre une nouvelle initialisation
-            safeInitializeApp();
-        }
-        
-        // Arrêter le watchdog après le maximum de vérifications
-        if (watchdogCount >= maxWatchdogChecks) {
-            clearInterval(watchdogInterval);
-            console.log('✅ Watchdog terminé');
-        }
-    }, 500);
+    // Le système de démarrage est maintenant dans js/boot.js
 
 // ========== NAVIGATION PAR SWIPE ==========
     
@@ -980,77 +911,23 @@
         localStorage.setItem('expenseTrackerData', JSON.stringify(appData));
     }
 
-// Vérifier et corriger l'affichage vide
+// Vérifier et corriger l'affichage vide (version simplifiée)
     function checkAndFixEmptyDisplay() {
+        // Cette fonction est maintenant principalement gérée par boot.js
+        // On la garde pour compatibilité avec le code existant
+        console.log('🔍 checkAndFixEmptyDisplay appelé');
+        
         const dashboardContent = document.getElementById('dashboard-content');
-        const tabsContainer = document.getElementById('tabs');
         const saved = localStorage.getItem('expenseTrackerData');
         
-        // Vérifier si l'affichage est vide
         const isDashboardEmpty = !dashboardContent || dashboardContent.innerHTML.trim() === '';
-        const areTabsIncomplete = !tabsContainer || tabsContainer.querySelectorAll('.tab').length < 2;
         
-        if ((isDashboardEmpty || areTabsIncomplete) && saved) {
-            console.warn('🔄 Affichage vide détecté !');
-            console.log('Dashboard vide:', isDashboardEmpty);
-            console.log('Onglets incomplets:', areTabsIncomplete);
-            
-            try {
-                const parsedData = JSON.parse(saved);
-                const userCount = Object.keys(parsedData.users || {}).length;
-                
-                console.log('Nombre d\'utilisateurs en mémoire:', userCount);
-                
-                if (userCount > 0) {
-                    console.log('🔄 Rechargement automatique des données...');
-                    loadData();
-                    renderApp();
-                    
-                    // Vérifier une dernière fois après un court délai
-                    setTimeout(() => {
-                        const newDashboard = document.getElementById('dashboard-content');
-                        const newTabs = document.getElementById('tabs');
-                        
-                        const stillEmpty = (!newDashboard || newDashboard.innerHTML.trim() === '') ||
-                                           (!newTabs || newTabs.querySelectorAll('.tab').length < 2);
-                        
-                        if (stillEmpty) {
-                            // Dernier recours : forcer un rechargement de la page
-                            const reloadCount = parseInt(sessionStorage.getItem('reloadCount') || '0');
-                            if (reloadCount < 2) {
-                                console.log('🔄 Forçage du rechargement de la page...');
-                                sessionStorage.setItem('reloadCount', String(reloadCount + 1));
-                                window.location.reload();
-                            } else {
-                                console.error('❌ Problème persistant après 2 rechargements');
-                                sessionStorage.removeItem('reloadCount');
-                                // Afficher un message à l'utilisateur
-                                alert('Une erreur est survenue. Veuillez fermer et rouvrir l\'application.');
-                            }
-                        } else {
-                            console.log('✅ Affichage restauré avec succès !');
-                            sessionStorage.removeItem('reloadCount');
-                        }
-                    }, 300);
-                }
-            } catch (e) {
-                console.error('Erreur vérification:', e);
-            }
-        } else if (!isDashboardEmpty && !areTabsIncomplete) {
-            // Tout va bien, nettoyer les flags
-            sessionStorage.removeItem('reloadCount');
+        if (isDashboardEmpty && saved) {
+            console.log('🔄 Re-rendu nécessaire...');
+            loadData();
+            renderApp();
         }
     }
-    
-    // Vérifier aussi quand l'app revient au premier plan (mobile)
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            console.log('📱 App revenue au premier plan');
-            setTimeout(() => {
-                checkAndFixEmptyDisplay();
-            }, 200);
-        }
-    });
     
     // Vérifier quand la fenêtre reprend le focus
     window.addEventListener('focus', () => {
