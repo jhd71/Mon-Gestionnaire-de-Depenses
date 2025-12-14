@@ -5,7 +5,7 @@
  * Résout les problèmes d'écran vide au démarrage PWA
  */
 
-const CACHE_NAME = 'gestionnaire-depenses-v11';
+const CACHE_NAME = 'gestionnaire-depenses-v12';
 
 // Fichiers à mettre en cache
 const STATIC_ASSETS = [
@@ -220,8 +220,10 @@ async function staleWhileRevalidate(request) {
     const fetchPromise = fetch(request)
         .then(networkResponse => {
             if (networkResponse && networkResponse.status === 200) {
+                // IMPORTANT: Cloner AVANT toute utilisation
+                const responseToCache = networkResponse.clone();
                 caches.open(CACHE_NAME).then(cache => {
-                    cache.put(request, networkResponse.clone());
+                    cache.put(request, responseToCache);
                 });
             }
             return networkResponse;
@@ -230,12 +232,17 @@ async function staleWhileRevalidate(request) {
     
     // Retourner le cache immédiatement s'il existe
     if (cachedResponse) {
+        // La mise à jour continue en arrière-plan
         return cachedResponse;
     }
     
     // Sinon attendre le réseau
     const networkResponse = await fetchPromise;
-    return networkResponse || new Response('', { status: 503 });
+    if (networkResponse) {
+        return networkResponse;
+    }
+    
+    return new Response('Ressource non disponible', { status: 503 });
 }
 
 // ============================================
