@@ -5,7 +5,7 @@
  * Résout les problèmes d'écran vide au démarrage PWA
  */
 
-const CACHE_NAME = 'gestionnaire-depenses-v14';
+const CACHE_NAME = 'gestionnaire-depenses-v15';
 
 // Fichiers à mettre en cache
 const STATIC_ASSETS = [
@@ -282,4 +282,4 @@ self.addEventListener('unhandledrejection', event => {
     console.error('❌ Promise rejetée:', event.reason);
 });
 
-console.log('📋 SW v14 chargé');
+console.log('📋 SW v15 chargé');
