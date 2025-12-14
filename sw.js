@@ -282,4 +282,4 @@ self.addEventListener('unhandledrejection', event => {
     console.error('❌ Promise rejetée:', event.reason);
 });
 
-console.log('📋 SW v11 chargé');
+console.log('📋 SW v14 chargé');
