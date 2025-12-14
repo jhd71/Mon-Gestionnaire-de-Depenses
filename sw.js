@@ -1,11 +1,11 @@
 /**
- * sw.js - Service Worker v11 - Simplifié et robuste
+ * sw.js - Service Worker - Simplifié et robuste
  * 
  * Stratégie : Network First STRICT pour HTML, Cache First pour assets
  * Résout les problèmes d'écran vide au démarrage PWA
  */
 
-const CACHE_NAME = 'gestionnaire-depenses-v16';
+const CACHE_NAME = 'gestionnaire-depenses-v20';
 
 // Fichiers à mettre en cache
 const STATIC_ASSETS = [
@@ -27,7 +27,7 @@ const STATIC_ASSETS = [
 // INSTALLATION
 // ============================================
 self.addEventListener('install', event => {
-    console.log('🔧 SW v11: Installation');
+    console.log('🔧 SW v20: Installation');
     
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -53,7 +53,7 @@ self.addEventListener('install', event => {
 // ACTIVATION
 // ============================================
 self.addEventListener('activate', event => {
-    console.log('🚀 SW v11: Activation');
+    console.log('🚀 SW v20: Activation');
     
     event.waitUntil(
         caches.keys()
