@@ -1,19 +1,18 @@
 /**
- * sw.js
+ * sw.js - Service Worker v11 - Simplifié et robuste
  * 
  * Stratégie : Network First STRICT pour HTML, Cache First pour assets
  * Résout les problèmes d'écran vide au démarrage PWA
  */
 
-const CACHE_NAME = 'gestionnaire-depenses-v19';
-console.log('📋 SW v19 chargé');
+const CACHE_NAME = 'gestionnaire-depenses-v16';
 
 // Fichiers à mettre en cache
 const STATIC_ASSETS = [
     '/css/styles.css',
-    '/js/security.js',
-    '/js/app.js',
+    '/js/boot.js',
     '/js/pdf-export.js',
+    '/js/security.js',
     '/js/ios-fixes.js',
     '/js/ios-install.js',
     '/manifest.json',
@@ -28,6 +27,7 @@ const STATIC_ASSETS = [
 // INSTALLATION
 // ============================================
 self.addEventListener('install', event => {
+    console.log('🔧 SW v11: Installation');
     
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -53,6 +53,7 @@ self.addEventListener('install', event => {
 // ACTIVATION
 // ============================================
 self.addEventListener('activate', event => {
+    console.log('🚀 SW v11: Activation');
     
     event.waitUntil(
         caches.keys()
@@ -231,12 +232,17 @@ async function staleWhileRevalidate(request) {
     
     // Retourner le cache immédiatement s'il existe
     if (cachedResponse) {
+        // La mise à jour continue en arrière-plan
         return cachedResponse;
     }
     
     // Sinon attendre le réseau
     const networkResponse = await fetchPromise;
-    return networkResponse || new Response('Ressource non disponible', { status: 503 });
+    if (networkResponse) {
+        return networkResponse;
+    }
+    
+    return new Response('Ressource non disponible', { status: 503 });
 }
 
 // ============================================
@@ -275,3 +281,5 @@ self.addEventListener('error', event => {
 self.addEventListener('unhandledrejection', event => {
     console.error('❌ Promise rejetée:', event.reason);
 });
+
+console.log('📋 SW v16 chargé');
