@@ -6,6 +6,7 @@
  */
 
 const CACHE_NAME = 'gestionnaire-depenses-v19';
+console.log('📋 SW v19 chargé');
 
 // Fichiers à mettre en cache
 const STATIC_ASSETS = [
@@ -276,5 +277,3 @@ self.addEventListener('error', event => {
 self.addEventListener('unhandledrejection', event => {
     console.error('❌ Promise rejetée:', event.reason);
 });
-
-console.log('📋 SW v11 chargé');
