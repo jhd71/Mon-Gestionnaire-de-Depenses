@@ -13,11 +13,18 @@
     // WATCHDOG ANTI-FREEZE PWA (cold start fix)
     // ============================================
     (function() {
-        var TIMEOUT = 4000; // 4 secondes max pour charger le JS
+        var TIMEOUT = 2000; // 2 secondes max pour charger le JS
         var MAX_RELOADS = 2;
         
         // Compter les reloads pour éviter boucle infinie
         var reloadCount = parseInt(sessionStorage.getItem('pwaReloadCount') || '0');
+        
+        // Si on est en mode reload, afficher l'écran de chargement
+        if (reloadCount > 0) {
+            document.addEventListener('DOMContentLoaded', function() {
+                showLoadingScreen();
+            });
+        }
         
         // Timer qui vérifie si le JS principal est chargé
         var watchdogTimer = setTimeout(function() {
@@ -28,14 +35,19 @@
                 if (reloadCount < MAX_RELOADS) {
                     console.warn('[PWA-FIX] Reload #' + (reloadCount + 1));
                     sessionStorage.setItem('pwaReloadCount', String(reloadCount + 1));
-                    window.location.reload(true);
+                    showLoadingScreen();
+                    setTimeout(function() {
+                        window.location.reload(true);
+                    }, 100);
                 } else {
                     console.error('[PWA-FIX] Échec après ' + MAX_RELOADS + ' reloads');
                     sessionStorage.removeItem('pwaReloadCount');
+                    showErrorScreen();
                 }
             } else {
-                // JS chargé, nettoyer le compteur
+                // JS chargé, nettoyer le compteur et cacher le loading
                 sessionStorage.removeItem('pwaReloadCount');
+                hideLoadingScreen();
             }
         }, TIMEOUT);
         
@@ -43,6 +55,49 @@
         window.addEventListener('beforeunload', function() {
             clearTimeout(watchdogTimer);
         });
+        
+        // Fonction pour afficher l'écran de chargement
+        function showLoadingScreen() {
+            var existing = document.getElementById('pwa-loading-screen');
+            if (existing) return;
+            
+            var overlay = document.createElement('div');
+            overlay.id = 'pwa-loading-screen';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#1f2937;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999999;';
+            overlay.innerHTML = '<div style="font-size:3rem;margin-bottom:1rem;animation:pulse 1.5s infinite">💰</div><div style="color:white;font-size:1.1rem;font-family:system-ui,sans-serif">Chargement...</div><style>@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}</style>';
+            
+            if (document.body) {
+                document.body.appendChild(overlay);
+            } else {
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.body.appendChild(overlay);
+                });
+            }
+        }
+        
+        // Fonction pour cacher l'écran de chargement
+        function hideLoadingScreen() {
+            var overlay = document.getElementById('pwa-loading-screen');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.3s';
+                setTimeout(function() {
+                    overlay.remove();
+                }, 300);
+            }
+        }
+        
+        // Fonction pour afficher l'écran d'erreur
+        function showErrorScreen() {
+            var overlay = document.getElementById('pwa-loading-screen') || document.createElement('div');
+            overlay.id = 'pwa-loading-screen';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#1f2937;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999999;padding:20px;text-align:center;';
+            overlay.innerHTML = '<div style="font-size:3rem;margin-bottom:1rem">⚠️</div><div style="color:white;font-size:1.1rem;font-family:system-ui,sans-serif;margin-bottom:1.5rem">Problème de chargement</div><button onclick="sessionStorage.clear();caches.keys().then(function(n){n.forEach(function(c){caches.delete(c)})});setTimeout(function(){location.reload(true)},300)" style="background:#8b5cf6;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:1rem;cursor:pointer">🔄 Vider le cache</button>';
+            
+            if (document.body) {
+                document.body.appendChild(overlay);
+            }
+        }
     })();
 </script>
     <meta charset="UTF-8">
