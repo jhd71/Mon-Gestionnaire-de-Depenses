@@ -903,11 +903,10 @@ body::before {
     width: 48px;
     height: 48px;
     border-radius: var(--radius-full);
-    background: var(--danger-gradient);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
+    font-size: 2.5rem;
     font-weight: 700;
     color: white;
     box-shadow: 0 4px 15px var(--danger-glow);
