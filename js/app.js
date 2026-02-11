@@ -2770,19 +2770,14 @@ function syncTheme() {
     }
     
     function getFilteredExpenses(userFilter) {
-        let expenses = [];
-        
-        // Collecter les dépenses communes
-        appData.commonExpenses.forEach(exp => {
-            // Vérifier le filtre utilisateur
-            if (userFilter !== 'all' && !exp.participants.includes(userFilter)) {
-                return;
-            }
-            
-            // Vérifier la période
-            if (!isInPeriod(exp.date)) {
-                return;
-            }
+    let expenses = [];
+    
+    // Collecter les dépenses communes (charges fixes = pas de filtre de période)
+    appData.commonExpenses.forEach(exp => {
+        // Vérifier le filtre utilisateur
+        if (userFilter !== 'all' && !exp.participants.includes(userFilter)) {
+            return;
+        }
             
             // Si filtre utilisateur, ne prendre que sa part
             let amount = exp.amount;
